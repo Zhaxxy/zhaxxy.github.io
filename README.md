@@ -3,7 +3,7 @@ Ill put stuff here
 
 # psfree-lapse
 ## host url will be
-https://zhaxxy.github.io/Al-Azif/psfree-lapse/src/index.html
+https://zhaxxy.github.io/Al-Azif/psfree-lapse/src
 ## cache url will be
 https://zhaxxy.github.io/Al-Azif/psfree-lapse/src/cache.html
 <br><br>
