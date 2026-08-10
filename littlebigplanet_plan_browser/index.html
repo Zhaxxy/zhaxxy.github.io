@@ -447,10 +447,23 @@
         >
     </div>
 
-    <label class="checkbox">
-        <input id="caseSensitive" type="checkbox">
-        Case sensitive
-    </label>
+
+<label class="checkbox">
+    <input id="searchTitle" type="checkbox" checked>
+    Title
+</label>
+
+<label class="checkbox">
+    <input id="searchDescription" type="checkbox" checked>
+    Description
+</label>
+
+<label class="checkbox">
+    <input id="caseSensitive" type="checkbox">
+    Case sensitive
+</label>
+
+
 
 </div>
 
@@ -577,7 +590,12 @@ const gameSelect = $("gameSelect");
 const languageSelect = $("languageSelect");
 const categorySelect = $("categorySelect");
 const searchInput = $("search");
+
+const searchTitleInput = $("searchTitle");
+const searchDescriptionInput = $("searchDescription");
 const caseSensitiveInput = $("caseSensitive");
+
+
 const resultsElement = $("results");
 const resultsHeader = $("resultsHeader");
 const detailsElement = $("details");
@@ -1168,6 +1186,7 @@ function populateCategoryFilter() {
  * ============================================================
  */
 
+
 function getFilteredPlans() {
     const rawSearch = normalizeSearch(
         searchInput.value
@@ -1175,6 +1194,8 @@ function getFilteredPlans() {
 
     const category = categorySelect.value;
     const caseSensitive = caseSensitiveInput.checked;
+    const searchTitle = searchTitleInput.checked;
+    const searchDescription = searchDescriptionInput.checked;
 
     let plans = state.plans;
 
@@ -1187,16 +1208,17 @@ function getFilteredPlans() {
         );
     }
 
+    /*
+     * No search text means return everything matching
+     * the category filter.
+     */
     if (rawSearch === "") {
         return plans;
     }
 
     /*
-     * Special GUID search:
-     *
-     *     g123456
-     *
-     * means guid 123456.
+     * GUID and hash searches are special searches and do not
+     * depend on the title/description toggles.
      */
     if (isGuidSearch(rawSearch)) {
         const guid = rawSearch.substring(1);
@@ -1206,18 +1228,16 @@ function getFilteredPlans() {
         );
     }
 
-    /*
-     * Special hash search:
-     *
-     *     40 hexadecimal characters
-     */
     if (isHashSearch(rawSearch)) {
         const wantedHash = caseSensitive
             ? rawSearch
             : rawSearch.toLowerCase();
 
         return plans.filter(plan => {
-            if (plan.hash === null || plan.hash === undefined) {
+            if (
+                plan.hash === null ||
+                plan.hash === undefined
+            ) {
                 return false;
             }
 
@@ -1229,27 +1249,43 @@ function getFilteredPlans() {
         });
     }
 
+    /*
+     * If neither Title nor Description is selected,
+     * nothing can match a normal text search.
+     */
+    if (!searchTitle && !searchDescription) {
+        return [];
+    }
+
     const needle = caseSensitive
         ? rawSearch
         : rawSearch.toLocaleLowerCase();
 
     return plans.filter(plan => {
-        const title = String(plan.title ?? "");
-        const description = String(plan.description ?? "");
+        let titleMatches = false;
+        let descriptionMatches = false;
 
-        if (caseSensitive) {
-            return (
-                title.includes(needle) ||
-                description.includes(needle)
-            );
+        if (searchTitle) {
+            const title = String(plan.title ?? "");
+
+            titleMatches = caseSensitive
+                ? title.includes(needle)
+                : title.toLocaleLowerCase().includes(needle);
         }
 
-        return (
-            title.toLocaleLowerCase().includes(needle) ||
-            description.toLocaleLowerCase().includes(needle)
-        );
+        if (searchDescription) {
+            const description = String(plan.description ?? "");
+
+            descriptionMatches = caseSensitive
+                ? description.includes(needle)
+                : description.toLocaleLowerCase().includes(needle);
+        }
+
+        return titleMatches || descriptionMatches;
     });
 }
+
+
 
 
 /*
