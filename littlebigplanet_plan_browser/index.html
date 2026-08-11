@@ -208,6 +208,16 @@
         background: var(--selected);
     }
 
+
+	.character-icon {
+		flex: 0 0 auto;
+		width: 20px;
+		height: 20px;
+		object-fit: contain;
+	}
+
+
+
     .plan-title {
         overflow: hidden;
         text-overflow: ellipsis;
@@ -420,6 +430,22 @@
 
 <div class="toolbar">
 
+
+<div class="toolbar-group">
+    <label for="characterSelect">Character</label>
+    <select id="characterSelect">
+        <option value="">All characters</option>
+        <option value="Not toggle, oddsock nor swoop">Not toggle, oddsock nor swoop</option>
+        <option value="Big Toggle">Big Toggle</option>
+        <option value="Small Toggle">Small Toggle</option>
+        <option value="Swoop">Swoop</option>
+        <option value="Oddsock">Oddsock</option>
+    </select>
+</div>
+
+
+
+
     <div class="toolbar-group">
         <label for="gameSelect">Game</label>
         <select id="gameSelect"></select>
@@ -532,6 +558,16 @@ const PATHS = {
 const DEFAULT_TITLE_KEY = "810378753";
 const DEFAULT_CATEGORY_KEY = "3309406048";
 
+
+const CHARACTER_MASK = 0x03E00000;
+
+const CHARACTER_MASK_SMALL_TOGGLE = 0x00400000;
+const CHARACTER_MASK_BIG_TOGGLE = 0x00200000;
+const CHARACTER_MASK_SWOOP = 0x00600000;
+const CHARACTER_MASK_ODDSOCK = 0x00800000;
+
+
+
 /*
  * sql.js WASM location.
  */
@@ -587,6 +623,8 @@ const state = {
 const $ = id => document.getElementById(id);
 
 const gameSelect = $("gameSelect");
+
+const characterSelect = $("characterSelect");
 const languageSelect = $("languageSelect");
 const categorySelect = $("categorySelect");
 const searchInput = $("search");
@@ -606,11 +644,66 @@ const loadingTitle = $("loadingTitle");
 const loadingText = $("loadingText");
 
 
+const CHARACTER_ICONS = {
+    "Big Toggle": "big_toggle_small_icon.png",
+    "Small Toggle": "small_toggle_small_icon.png",
+    "Swoop": "swoop_small_icon.png",
+    "Oddsock": "oddsock_small_icon.png"
+};
+
+
 /*
  * ============================================================
  * Utility functions
  * ============================================================
  */
+
+
+function getCharacterIcon(character) {
+    const filename = CHARACTER_ICONS[character];
+
+    if (!filename) {
+        return null;
+    }
+
+    return `${PATHS.assetsRoot}/${pathPart(filename)}`;
+}
+
+
+
+function getCharacterFromSubType(subType) {
+    if (subType === null || subType === undefined) {
+        return "Not toggle, oddsock nor swoop";
+    }
+
+    const value = Number(subType);
+
+    if (!Number.isFinite(value)) {
+        return "Not toggle, oddsock nor swoop";
+    }
+
+    const character = value & CHARACTER_MASK;
+
+    if (character === CHARACTER_MASK_BIG_TOGGLE) {
+        return "Big Toggle";
+    }
+
+    if (character === CHARACTER_MASK_SMALL_TOGGLE) {
+        return "Small Toggle";
+    }
+
+    if (character === CHARACTER_MASK_SWOOP) {
+        return "Swoop";
+    }
+
+    if (character === CHARACTER_MASK_ODDSOCK) {
+        return "Oddsock";
+    }
+
+    return "Not toggle, oddsock nor swoop";
+}
+
+
 
 function setLoading(title, text = "") {
     loadingElement.style.display = "flex";
@@ -653,7 +746,12 @@ function gameAssetPath(gameId, file) {
 }
 
 function planIconPath(filename) {
-    return `${PATHS.assetsRoot}/plan_icons/${pathPart(filename)}`;
+  const name = filename.replace(/\.[^.]+$/, '');
+  const isSha1 = /^[a-f0-9]{40}$/i.test(name);
+
+  return isSha1
+    ? `${PATHS.assetsRoot}/plan_icons/${pathPart(filename)}`
+    : `${PATHS.assetsRoot}/${pathPart(filename)}`;
 }
 
 function isMissing(value) {
@@ -1038,6 +1136,10 @@ function getTitle(titleKey) {
     );
 }
 
+
+
+
+
 function getCategory(categoryKey) {
     if (categoryKey === null || categoryKey === undefined || categoryKey === "") {
         return (
@@ -1050,6 +1152,31 @@ function getCategory(categoryKey) {
         translationForKey(categoryKey) ??
         "MISSING_TRANS_KEY"
     );
+}
+
+
+function getPlanCategory(categoryKey, popitType) {
+    /*
+     * Plans using the default category key can have their
+     * category determined by popit_type instead.
+     *
+     * Example:
+     *
+     * category_key = 3309406048
+     * popit_type   = HEAD
+     *
+     * => category = HEAD
+     */
+    if (
+        (String(categoryKey) === DEFAULT_CATEGORY_KEY || !categoryKey) &&
+        popitType !== null &&
+        popitType !== undefined &&
+        String(popitType).trim() !== ""
+    ) {
+        return `${String(popitType)} (${getCategory(DEFAULT_CATEGORY_KEY)})`
+    }
+
+    return getCategory(categoryKey);
 }
 
 function getDescription(descriptionKey) {
@@ -1088,7 +1215,9 @@ async function preparePlans() {
             title_key,
             description_key,
             category_key,
-            creator
+            creator,
+			sub_type,
+			popit_type
         FROM plans
     `);
 
@@ -1107,13 +1236,16 @@ async function preparePlans() {
             titleKey,
             descriptionKey,
             categoryKey,
-            creator
+            creator,
+			sub_type,
+			popitType
         ] = row;
 
         const title = getTitle(titleKey);
         const description = getDescription(descriptionKey);
-        const category = getCategory(categoryKey);
-
+        const category = getPlanCategory(categoryKey,popitType);
+		const character = getCharacterFromSubType(sub_type);
+		
         return {
             guid,
             filePath,
@@ -1128,7 +1260,12 @@ async function preparePlans() {
 
             title,
             description,
-            category
+            category,
+			
+			character,
+			
+			sub_type,
+			popitType,
         };
     });
 
@@ -1196,8 +1333,18 @@ function getFilteredPlans() {
     const caseSensitive = caseSensitiveInput.checked;
     const searchTitle = searchTitleInput.checked;
     const searchDescription = searchDescriptionInput.checked;
-
+	const character = characterSelect.value;
+	
     let plans = state.plans;
+
+	
+	if (character !== "") {
+		plans = plans.filter(
+			plan => plan.character === character
+		);
+	}
+
+
 
     /*
      * Category filtering is independent of search.
@@ -1362,14 +1509,37 @@ function renderResults() {
 
             button.dataset.guid = String(plan.guid);
 
-            button.innerHTML = `
-                <div class="plan-title">
-                    ${escapeHtml(plan.title)}
-                </div>
-                <div class="plan-guid">
-                    g${escapeHtml(plan.guid)}
-                </div>
-            `;
+
+const characterIcon = getCharacterIcon(
+    plan.character
+);
+
+button.innerHTML = `
+    <div class="plan-title">
+        <span class="plan-title-text">
+            ${escapeHtml(plan.title)}
+        </span>
+
+        ${
+            characterIcon
+                ? `
+                    <img
+                        class="character-icon"
+                        src="${escapeHtml(characterIcon)}"
+                        alt="${escapeHtml(plan.character)}"
+                        title="${escapeHtml(plan.character)}"
+                    >
+                `
+                : ""
+        }
+    </div>
+
+    <div class="plan-guid">
+        g${escapeHtml(plan.guid)}
+    </div>
+`;
+
+
 
             button.addEventListener(
                 "click",
@@ -1397,7 +1567,7 @@ function renderResults() {
  * Icon resolution:
  *
  * 1. No icon_guid:
- *      missing_icon_guid_in_texture_guids_json.png
+ *      plan_has_no_icon.png
  *
  * 2. icon_guid exists but isn't present in texture_guids.json:
  *      missing_icon_guid_in_texture_guids_json.png
@@ -1412,11 +1582,11 @@ function getIconFilename(plan) {
     if (
         plan.iconGuid === null ||
         plan.iconGuid === undefined ||
-        plan.iconGuid === ""
+        plan.iconGuid === "" ||
+		plan.iconGuid === 0
     ) {
-        return "missing_icon_guid_in_texture_guids_json.png";
+        return "plan_has_no_icon.png";
     }
-
     const key = String(plan.iconGuid);
 
     if (
@@ -1472,17 +1642,7 @@ async function selectPlan(plan) {
 
 function renderDetails(plan, requestId) {
     const iconFilename = getIconFilename(plan);
-
-    const primaryIcon =
-        plan.iconGuid === null ||
-        plan.iconGuid === undefined ||
-        plan.iconGuid === "" ||
-        !Object.prototype.hasOwnProperty.call(
-            state.textureGuids,
-            String(plan.iconGuid)
-        )
-            ? getMissingGuidIcon()
-            : planIconPath(iconFilename);
+    const primaryIcon = planIconPath(iconFilename);
 
     detailsElement.innerHTML = `
         <div class="details">
@@ -1532,6 +1692,14 @@ function renderDetails(plan, requestId) {
                     "Creator",
                     plan.creator
                 )}
+
+
+				${metadataRow(
+					"Character",
+					plan.character
+				)}
+
+
 
                 ${metadataRow(
                     "File path",
@@ -1650,6 +1818,16 @@ gameSelect.addEventListener(
         }
     }
 );
+
+
+characterSelect.addEventListener(
+    "change",
+    () => {
+        renderResults();
+    }
+);
+
+
 
 languageSelect.addEventListener(
     "change",
