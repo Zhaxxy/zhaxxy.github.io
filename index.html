@@ -1,0 +1,1975 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LittleBigPlanet Plan Browser (frontend entirely by chatgpt)</title>
+
+
+<style>
+    :root {
+        color-scheme: dark;
+
+        --bg: #111318;
+        --panel: #191c23;
+        --panel-2: #20242d;
+        --border: #343945;
+        --text: #f1f3f7;
+        --muted: #9da4b2;
+        --accent: #6ea8fe;
+        --accent-hover: #8ab8ff;
+        --danger: #ff6b6b;
+        --selected: #29364e;
+        --input: #101218;
+    }
+
+    * {
+        box-sizing: border-box;
+    }
+
+    html,
+    body {
+        margin: 0;
+        padding: 0;
+        min-height: 100%;
+    }
+
+    body {
+        font-family:
+            system-ui,
+            -apple-system,
+            BlinkMacSystemFont,
+            "Segoe UI",
+            sans-serif;
+        background: var(--bg);
+        color: var(--text);
+    }
+
+    button,
+    input,
+    select {
+        font: inherit;
+    }
+
+    button,
+    select,
+    input {
+        border: 1px solid var(--border);
+        background: var(--input);
+        color: var(--text);
+        border-radius: 6px;
+    }
+
+    button {
+        cursor: pointer;
+    }
+
+    button:hover {
+        border-color: #505766;
+    }
+
+    .app {
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
+    }
+
+    header {
+        padding: 18px 24px;
+        border-bottom: 1px solid var(--border);
+        background: var(--panel);
+    }
+
+    header h1 {
+        margin: 0 0 5px;
+        font-size: 22px;
+    }
+
+    header .status {
+        color: var(--muted);
+        font-size: 13px;
+    }
+
+    .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        padding: 14px 24px;
+        border-bottom: 1px solid var(--border);
+        background: var(--panel);
+    }
+
+    .toolbar-group {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .toolbar label {
+        color: var(--muted);
+        font-size: 13px;
+    }
+
+    select,
+    input[type="search"] {
+        height: 38px;
+        padding: 0 11px;
+    }
+
+    select {
+        min-width: 180px;
+    }
+
+    #search {
+        width: min(500px, 55vw);
+    }
+
+    .checkbox {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        height: 38px;
+        padding: 0 10px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        background: var(--input);
+        color: var(--muted);
+        font-size: 13px;
+        cursor: pointer;
+    }
+
+    .checkbox input {
+        accent-color: var(--accent);
+    }
+
+    main {
+        display: grid;
+        grid-template-columns: minmax(300px, 460px) 1fr;
+        flex: 1;
+        min-height: 0;
+    }
+
+    .results-panel {
+        min-width: 0;
+        border-right: 1px solid var(--border);
+        overflow: auto;
+    }
+
+    .details-panel {
+        min-width: 0;
+        overflow: auto;
+    }
+
+    .results-header {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        padding: 12px 16px;
+        border-bottom: 1px solid var(--border);
+        background: var(--panel);
+        color: var(--muted);
+        font-size: 13px;
+    }
+
+    .category {
+        border-bottom: 1px solid #272b34;
+    }
+
+    .category-name {
+        padding: 9px 16px 7px;
+        background: var(--panel-2);
+        color: #dce2ec;
+        font-size: 13px;
+        font-weight: 700;
+    }
+
+    .plan-list {
+        padding: 3px 0;
+    }
+
+    .plan-item {
+        display: block;
+        width: 100%;
+        padding: 8px 16px 8px 29px;
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+        color: var(--text);
+        text-align: left;
+        transition: background 0.1s;
+    }
+
+    .plan-item:hover {
+        background: #222733;
+    }
+
+    .plan-item.selected {
+        background: var(--selected);
+    }
+
+
+	.character-icon {
+		flex: 0 0 auto;
+		width: 20px;
+		height: 20px;
+		object-fit: contain;
+	}
+
+
+
+    .plan-title {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 14px;
+    }
+
+    .plan-guid {
+        margin-top: 2px;
+        color: var(--muted);
+        font-family: monospace;
+        font-size: 11px;
+    }
+
+    .empty {
+        padding: 30px 20px;
+        color: var(--muted);
+        text-align: center;
+    }
+
+    .details {
+        max-width: 1000px;
+        margin: 0 auto;
+        padding: 28px;
+    }
+
+    .details-placeholder {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 300px;
+        color: var(--muted);
+    }
+
+    .plan-heading {
+        display: flex;
+        gap: 24px;
+        align-items: flex-start;
+        margin-bottom: 28px;
+    }
+
+    .icon-container {
+        flex: 0 0 160px;
+        width: 160px;
+        height: 160px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        background: #0d0f13;
+    }
+
+    .icon-container img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        image-rendering: auto;
+    }
+
+    .heading-text {
+        min-width: 0;
+    }
+
+    .heading-text h2 {
+        margin: 0 0 8px;
+        font-size: 25px;
+        overflow-wrap: anywhere;
+    }
+
+    .heading-category {
+        color: var(--muted);
+        font-size: 14px;
+    }
+
+    .description {
+        margin: 0 0 28px;
+        padding: 18px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--panel);
+        line-height: 1.55;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+    }
+
+    .metadata {
+        display: grid;
+        grid-template-columns: 150px minmax(0, 1fr);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        overflow: hidden;
+    }
+
+    .metadata-row {
+        display: contents;
+    }
+
+    .metadata-key,
+    .metadata-value {
+        padding: 11px 13px;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .metadata-row:last-child .metadata-key,
+    .metadata-row:last-child .metadata-value {
+        border-bottom: 0;
+    }
+
+    .metadata-key {
+        background: var(--panel-2);
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 600;
+    }
+
+    .metadata-value {
+        min-width: 0;
+        background: var(--panel);
+        overflow-wrap: anywhere;
+        font-family: monospace;
+        font-size: 13px;
+    }
+
+    .loading {
+        position: fixed;
+        inset: 0;
+        z-index: 100;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(10, 11, 14, 0.92);
+    }
+
+    .loading-box {
+        width: min(500px, calc(100vw - 40px));
+        padding: 25px;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        background: var(--panel);
+        text-align: center;
+    }
+
+    .loading-text {
+        color: var(--muted);
+        margin-top: 8px;
+        font-size: 13px;
+    }
+
+    .error {
+        margin: 20px;
+        padding: 15px;
+        border: 1px solid #713838;
+        border-radius: 8px;
+        background: #261719;
+        color: #ffb5b5;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+    }
+
+    @media (max-width: 800px) {
+        main {
+            grid-template-columns: 1fr;
+        }
+
+        .results-panel {
+            max-height: 45vh;
+            border-right: 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        #search {
+            width: 100%;
+            min-width: 200px;
+        }
+
+        .toolbar {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .toolbar-group {
+            width: 100%;
+        }
+
+        .toolbar-group select,
+        .toolbar-group input {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .plan-heading {
+            flex-direction: column;
+        }
+    }
+</style>
+
+
+</head>
+
+<body>
+<div class="app">
+
+
+<header>
+    <h1>LittleBigPlanet Plan Browser (frontend entirely by chatgpt)</h1>
+    <div class="status" id="status">Loading...</div>
+</header>
+
+<div class="toolbar">
+
+
+<div class="toolbar-group">
+    <label for="characterSelect">Character</label>
+    <select id="characterSelect">
+        <option value="">All characters</option>
+        <option value="Not toggle, oddsock nor swoop">Not toggle, oddsock nor swoop</option>
+        <option value="Big Toggle">Big Toggle</option>
+        <option value="Small Toggle">Small Toggle</option>
+        <option value="Swoop">Swoop</option>
+        <option value="Oddsock">Oddsock</option>
+    </select>
+</div>
+
+
+
+
+    <div class="toolbar-group">
+        <label for="gameSelect">Game</label>
+        <select id="gameSelect"></select>
+    </div>
+
+    <div class="toolbar-group">
+        <label for="languageSelect">Language</label>
+        <select id="languageSelect"></select>
+    </div>
+
+    <div class="toolbar-group">
+        <label for="categorySelect">Category</label>
+        <select id="categorySelect">
+            <option value="">All categories</option>
+        </select>
+    </div>
+
+    <div class="toolbar-group" style="flex: 1;">
+        <input
+            id="search"
+            type="search"
+            placeholder="Search title or description..."
+            autocomplete="off"
+            spellcheck="false"
+        >
+    </div>
+
+
+<label class="checkbox">
+    <input id="searchTitle" type="checkbox" checked>
+    Title
+</label>
+
+<label class="checkbox">
+    <input id="searchDescription" type="checkbox" checked>
+    Description
+</label>
+
+<label class="checkbox">
+    <input id="caseSensitive" type="checkbox">
+    Case sensitive
+</label>
+
+
+
+</div>
+
+<main>
+
+    <section class="results-panel">
+        <div class="results-header" id="resultsHeader">
+            0 plans
+        </div>
+
+        <div id="results">
+            <div class="empty">
+                Loading plans...
+            </div>
+        </div>
+    </section>
+
+    <section class="details-panel">
+        <div id="details">
+            <div class="details-placeholder">
+                Select a plan to view its details.
+            </div>
+        </div>
+    </section>
+
+</main>
+
+
+</div>
+
+<div class="loading" id="loading">
+    <div class="loading-box">
+        <strong id="loadingTitle">Loading plan database...</strong>
+        <div class="loading-text" id="loadingText">
+            Please wait.
+        </div>
+    </div>
+</div>
+
+<!--
+    sql.js is the SQLite implementation used entirely in the browser.
+
+    The database itself is never uploaded anywhere.
+-->
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.13.0/sql-wasm.js"></script>
+
+<script>
+"use strict";
+
+/*
+ * ============================================================
+ * Configuration
+ * ============================================================
+ */
+
+const PATHS = {
+    gamesList: "games_list.json",
+    gamesRoot: "lbppb_games",
+    assetsRoot: "lbppb_assets"
+};
+
+/*
+ * These are the fallback language keys specified in the question.
+ */
+const DEFAULT_TITLE_KEY = "810378753";
+const DEFAULT_CATEGORY_KEY = "3309406048";
+
+
+const CHARACTER_MASK = 0x03E00000;
+
+const CHARACTER_MASK_SMALL_TOGGLE = 0x00400000;
+const CHARACTER_MASK_BIG_TOGGLE = 0x00200000;
+const CHARACTER_MASK_SWOOP = 0x00600000;
+const CHARACTER_MASK_ODDSOCK = 0x00800000;
+
+
+
+/*
+ * sql.js WASM location.
+ */
+const SQL_WASM_PATH =
+    "https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.13.0/";
+
+
+/*
+ * ============================================================
+ * Application state
+ * ============================================================
+ */
+
+const state = {
+    sql: null,
+    gameId: null,
+    gameName: null,
+
+    db: null,
+
+    languages: [],
+    language: null,
+    translations: {},
+
+    /*
+     * All plans loaded from SQLite and augmented with translated
+     * strings.
+     */
+    plans: [],
+
+    /*
+     * Map:
+     *   texture GUID -> sha1
+     */
+    textureGuids: {},
+
+    selectedGuid: null,
+
+    /*
+     * Used to prevent stale async icon requests from changing
+     * the currently displayed plan.
+     */
+    detailsRequestId: 0
+};
+
+
+/*
+ * ============================================================
+ * DOM helpers
+ * ============================================================
+ */
+
+const $ = id => document.getElementById(id);
+
+const gameSelect = $("gameSelect");
+
+const characterSelect = $("characterSelect");
+const languageSelect = $("languageSelect");
+const categorySelect = $("categorySelect");
+const searchInput = $("search");
+
+const searchTitleInput = $("searchTitle");
+const searchDescriptionInput = $("searchDescription");
+const caseSensitiveInput = $("caseSensitive");
+
+
+const resultsElement = $("results");
+const resultsHeader = $("resultsHeader");
+const detailsElement = $("details");
+const statusElement = $("status");
+
+const loadingElement = $("loading");
+const loadingTitle = $("loadingTitle");
+const loadingText = $("loadingText");
+
+
+const CHARACTER_ICONS = {
+    "Big Toggle": "big_toggle_small_icon.png",
+    "Small Toggle": "small_toggle_small_icon.png",
+    "Swoop": "swoop_small_icon.png",
+    "Oddsock": "oddsock_small_icon.png"
+};
+
+
+/*
+ * ============================================================
+ * Utility functions
+ * ============================================================
+ */
+
+
+function getCharacterIcon(character) {
+    const filename = CHARACTER_ICONS[character];
+
+    if (!filename) {
+        return null;
+    }
+
+    return `${PATHS.assetsRoot}/${pathPart(filename)}`;
+}
+
+
+
+function getCharacterFromSubType(subType) {
+    if (subType === null || subType === undefined) {
+        return "Not toggle, oddsock nor swoop";
+    }
+
+    const value = Number(subType);
+
+    if (!Number.isFinite(value)) {
+        return "Not toggle, oddsock nor swoop";
+    }
+
+    const character = value & CHARACTER_MASK;
+
+    if (character === CHARACTER_MASK_BIG_TOGGLE) {
+        return "Big Toggle";
+    }
+
+    if (character === CHARACTER_MASK_SMALL_TOGGLE) {
+        return "Small Toggle";
+    }
+
+    if (character === CHARACTER_MASK_SWOOP) {
+        return "Swoop";
+    }
+
+    if (character === CHARACTER_MASK_ODDSOCK) {
+        return "Oddsock";
+    }
+
+    return "Not toggle, oddsock nor swoop";
+}
+
+
+
+function setLoading(title, text = "") {
+    loadingElement.style.display = "flex";
+    loadingTitle.textContent = title;
+    loadingText.textContent = text;
+}
+
+function hideLoading() {
+    loadingElement.style.display = "none";
+}
+
+function setStatus(text) {
+    statusElement.textContent = text;
+}
+
+function escapeHtml(value) {
+    return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+}
+
+/*
+ * Since the server is expected to provide these files, encode
+ * individual path components rather than allowing a value from
+ * JSON to alter the directory structure.
+ */
+function pathPart(value) {
+    return encodeURIComponent(String(value));
+}
+
+function gamePath(gameId, file) {
+    return `${PATHS.gamesRoot}/${pathPart(gameId)}/${file}`;
+}
+
+function gameAssetPath(gameId, file) {
+    return `${PATHS.gamesRoot}/${pathPart(gameId)}/${file}`;
+}
+
+function planIconPath(filename) {
+  const name = filename.replace(/\.[^.]+$/, '');
+  const isSha1 = /^[a-f0-9]{40}$/i.test(name);
+
+  return isSha1
+    ? `${PATHS.assetsRoot}/plan_icons/${pathPart(filename)}`
+    : `${PATHS.assetsRoot}/${pathPart(filename)}`;
+}
+
+function isMissing(value) {
+    return value === null || value === undefined;
+}
+
+function normalizeSearch(value) {
+    return value.trim();
+}
+
+function isGuidSearch(value) {
+    return /^g\d+$/.test(value);
+}
+
+function isHashSearch(value) {
+    return /^[0-9a-fA-F]{40}$/.test(value);
+}
+
+function formatSize(value) {
+    if (value === null || value === undefined || value === "") {
+        return "";
+    }
+
+    const bytes = Number(value);
+
+    if (!Number.isFinite(bytes)) {
+        return String(value);
+    }
+
+    if (bytes < 1024) {
+        return `${bytes} B`;
+    }
+
+    if (bytes < 1024 * 1024) {
+        return `${(bytes / 1024).toFixed(2)} KiB`;
+    }
+
+    if (bytes < 1024 * 1024 * 1024) {
+        return `${(bytes / (1024 * 1024)).toFixed(2)} MiB`;
+    }
+
+    return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GiB`;
+}
+
+function compareStrings(a, b) {
+    return String(a).localeCompare(
+        String(b),
+        undefined,
+        {
+            sensitivity: "base",
+            numeric: true
+        }
+    );
+}
+
+
+/*
+ * ============================================================
+ * JSON / binary loading
+ * ============================================================
+ */
+
+async function fetchJson(url) {
+    const response = await fetch(url, {
+        cache: "no-store"
+    });
+
+    if (!response.ok) {
+        throw new Error(
+            `Failed to load ${url}: HTTP ${response.status}`
+        );
+    }
+
+    return response.json();
+}
+
+async function fetchText(url) {
+    const response = await fetch(url, {
+        cache: "no-store"
+    });
+
+    if (!response.ok) {
+        throw new Error(
+            `Failed to load ${url}: HTTP ${response.status}`
+        );
+    }
+
+    return response.text();
+}
+
+async function fetchArrayBuffer(url) {
+    const response = await fetch(url, {
+        cache: "no-store"
+    });
+
+    if (!response.ok) {
+        throw new Error(
+            `Failed to load ${url}: HTTP ${response.status}`
+        );
+    }
+
+    return response.arrayBuffer();
+}
+
+
+/*
+ * ============================================================
+ * Initial game loading
+ * ============================================================
+ */
+
+
+async function loadGamesList() {
+    const games = await fetchJson(PATHS.gamesList);
+
+    if (!Array.isArray(games)) {
+        throw new Error("games_list.json must contain an array.");
+    }
+
+    gameSelect.innerHTML = "";
+
+    for (const gameId of games) {
+        let gameName;
+
+        try {
+            gameName = (
+                await fetchText(
+                    gamePath(gameId, "game_name.txt")
+                )
+            ).trim();
+        } catch (error) {
+            console.warn(
+                `Could not load game_name.txt for ${gameId}:`,
+                error
+            );
+
+            /*
+             * Fall back to the game ID if game_name.txt
+             * cannot be loaded.
+             */
+            gameName = gameId;
+        }
+
+        const option = document.createElement("option");
+
+        /*
+         * Keep the directory/game ID as the actual value.
+         */
+        option.value = gameId;
+
+        /*
+         * Display the contents of game_name.txt.
+         */
+        option.textContent = gameName;
+
+        gameSelect.appendChild(option);
+    }
+
+    if (games.length === 0) {
+        throw new Error("games_list.json contains no games.");
+    }
+
+    return games;
+}
+
+
+
+async function loadGame(gameId) {
+    state.gameId = gameId;
+
+    setLoading(
+        "Loading game...",
+        gameId
+    );
+
+    /*
+     * game_name.txt
+     */
+    const gameName = await fetchText(
+        gamePath(gameId, "game_name.txt")
+    );
+
+    state.gameName = gameName.trim();
+
+    /*
+     * languages_list.json
+     */
+    const languages = await fetchJson(
+        gamePath(gameId, "languages_list.json")
+    );
+
+    if (!Array.isArray(languages)) {
+        throw new Error(
+            `${gameId}/languages_list.json must contain an array.`
+        );
+    }
+
+    state.languages = languages;
+
+    languageSelect.innerHTML = "";
+
+    for (const languageFile of languages) {
+        const option = document.createElement("option");
+
+        option.value = languageFile;
+
+        /*
+         * "english.json" -> "english"
+         */
+        option.textContent = languageFile.replace(
+            /\.json$/i,
+            ""
+        );
+
+        languageSelect.appendChild(option);
+    }
+
+    if (languages.length === 0) {
+        throw new Error(
+            `${gameId}/languages_list.json contains no languages.`
+        );
+    }
+
+    /*
+     * Default to the first language.
+     */
+    state.language = languages[0];
+
+    languageSelect.value = state.language;
+
+    await loadGameDatabase();
+    await loadTranslations();
+    await loadTextureGuids();
+
+    await preparePlans();
+
+    populateCategoryFilter();
+    renderResults();
+
+    setStatus(
+        `${state.gameName} — ${state.plans.length.toLocaleString()} plans`
+    );
+
+    hideLoading();
+}
+
+
+/*
+ * ============================================================
+ * SQLite
+ * ============================================================
+ */
+
+async function loadGameDatabase() {
+    setLoading(
+        "Loading SQLite database...",
+        "Opening plan_details.db"
+    );
+
+    const dbBuffer = await fetchArrayBuffer(
+        gamePath(state.gameId, "plan_details.db")
+    );
+
+    state.db = new state.sql.Database(
+        new Uint8Array(dbBuffer)
+    );
+}
+
+
+/*
+ * ============================================================
+ * Translation loading
+ * ============================================================
+ */
+
+async function loadTranslations() {
+    setLoading(
+        "Loading translations...",
+        state.language
+    );
+
+    const languageFile = state.language;
+
+    const translations = await fetchJson(
+        gamePath(
+            state.gameId,
+            `languages/${pathPart(languageFile)}`
+        )
+    );
+
+    if (
+        translations === null ||
+        typeof translations !== "object" ||
+        Array.isArray(translations)
+    ) {
+        throw new Error(
+            `${state.gameId}/languages/${languageFile} must contain a JSON object.`
+        );
+    }
+
+    state.translations = translations;
+}
+
+
+/*
+ * ============================================================
+ * Texture GUID loading
+ * ============================================================
+ */
+
+async function loadTextureGuids() {
+    setLoading(
+        "Loading texture information...",
+        "Reading texture_guids.json"
+    );
+
+    const textureGuids = await fetchJson(
+        gamePath(
+            state.gameId,
+            "texture_guids.json"
+        )
+    );
+
+    if (
+        textureGuids === null ||
+        typeof textureGuids !== "object" ||
+        Array.isArray(textureGuids)
+    ) {
+        throw new Error(
+            `${state.gameId}/texture_guids.json must contain an object.`
+        );
+    }
+
+    state.textureGuids = textureGuids;
+}
+
+
+/*
+ * ============================================================
+ * Translation helpers
+ * ============================================================
+ */
+
+/*
+ * The JSON language object has number keys.
+ *
+ * SQLite values may come back as numbers or strings, so convert
+ * the key to a string before looking it up.
+ */
+function translationForKey(key) {
+    if (key === null || key === undefined || key === "") {
+        return null;
+    }
+
+    const normalizedKey = String(key);
+
+    if (
+        Object.prototype.hasOwnProperty.call(
+            state.translations,
+            normalizedKey
+        )
+    ) {
+        return String(
+            state.translations[normalizedKey]
+        );
+    }
+
+    return "MISSING_TRANS_KEY";
+}
+
+function getTitle(titleKey) {
+    if (titleKey === null || titleKey === undefined || titleKey === "") {
+        return (
+            translationForKey(DEFAULT_TITLE_KEY) ??
+            "MISSING_TRANS_KEY"
+        );
+    }
+
+    return (
+        translationForKey(titleKey) ??
+        "MISSING_TRANS_KEY"
+    );
+}
+
+
+
+
+
+function getCategory(categoryKey) {
+    if (categoryKey === null || categoryKey === undefined || categoryKey === "") {
+        return (
+            translationForKey(DEFAULT_CATEGORY_KEY) ??
+            "MISSING_TRANS_KEY"
+        );
+    }
+
+    return (
+        translationForKey(categoryKey) ??
+        "MISSING_TRANS_KEY"
+    );
+}
+
+
+function getPlanCategory(categoryKey, popitType) {
+    /*
+     * Plans using the default category key can have their
+     * category determined by popit_type instead.
+     *
+     * Example:
+     *
+     * category_key = 3309406048
+     * popit_type   = HEAD
+     *
+     * => category = HEAD
+     */
+    if (
+        (String(categoryKey) === DEFAULT_CATEGORY_KEY || !categoryKey) &&
+        popitType !== null &&
+        popitType !== undefined &&
+        String(popitType).trim() !== ""
+    ) {
+        return `${String(popitType)} (${getCategory(DEFAULT_CATEGORY_KEY)})`
+    }
+
+    return getCategory(categoryKey);
+}
+
+function getDescription(descriptionKey) {
+    if (
+        descriptionKey === null ||
+        descriptionKey === undefined ||
+        descriptionKey === ""
+    ) {
+        return "";
+    }
+
+    return translationForKey(descriptionKey) ?? "MISSING_TRANS_KEY";
+}
+
+
+/*
+ * ============================================================
+ * Read plans from SQLite
+ * ============================================================
+ */
+
+async function preparePlans() {
+    setLoading(
+        "Reading plans...",
+        "Querying plan_details.db"
+    );
+
+    const result = state.db.exec(`
+        SELECT
+            guid,
+            file_path,
+            timestamp,
+            size,
+            hash,
+            icon_guid,
+            title_key,
+            description_key,
+            category_key,
+            creator,
+			sub_type,
+			popit_type
+        FROM plans
+    `);
+
+    const rows = result.length
+        ? result[0].values
+        : [];
+
+    state.plans = rows.map(row => {
+        const [
+            guid,
+            filePath,
+            timestamp,
+            size,
+            hash,
+            iconGuid,
+            titleKey,
+            descriptionKey,
+            categoryKey,
+            creator,
+			sub_type,
+			popitType
+        ] = row;
+
+        const title = getTitle(titleKey);
+        const description = getDescription(descriptionKey);
+        const category = getPlanCategory(categoryKey,popitType);
+		const character = getCharacterFromSubType(sub_type);
+		
+        return {
+            guid,
+            filePath,
+            timestamp,
+            size,
+            hash,
+            iconGuid,
+            titleKey,
+            descriptionKey,
+            categoryKey,
+            creator,
+
+            title,
+            description,
+            category,
+			
+			character,
+			
+			sub_type,
+			popitType,
+        };
+    });
+
+    /*
+     * Sort alphabetically by category and then title.
+     */
+    state.plans.sort((a, b) => {
+        const categoryCompare = compareStrings(
+            a.category,
+            b.category
+        );
+
+        if (categoryCompare !== 0) {
+            return categoryCompare;
+        }
+
+        return compareStrings(
+            a.title,
+            b.title
+        );
+    });
+}
+
+
+/*
+ * ============================================================
+ * Category filter
+ * ============================================================
+ */
+
+function populateCategoryFilter() {
+    const categories = [
+        ...new Set(
+            state.plans.map(plan => plan.category)
+        )
+    ].sort(compareStrings);
+
+    categorySelect.innerHTML =
+        `<option value="">All categories</option>`;
+
+    for (const category of categories) {
+        const option = document.createElement("option");
+
+        option.value = category;
+        option.textContent = category;
+
+        categorySelect.appendChild(option);
+    }
+}
+
+
+/*
+ * ============================================================
+ * Searching
+ * ============================================================
+ */
+
+
+function getFilteredPlans() {
+    const rawSearch = normalizeSearch(
+        searchInput.value
+    );
+
+    const category = categorySelect.value;
+    const caseSensitive = caseSensitiveInput.checked;
+    const searchTitle = searchTitleInput.checked;
+    const searchDescription = searchDescriptionInput.checked;
+	const character = characterSelect.value;
+	
+    let plans = state.plans;
+
+	
+	if (character !== "") {
+		plans = plans.filter(
+			plan => plan.character === character
+		);
+	}
+
+
+
+    /*
+     * Category filtering is independent of search.
+     */
+    if (category !== "") {
+        plans = plans.filter(
+            plan => plan.category === category
+        );
+    }
+
+    /*
+     * No search text means return everything matching
+     * the category filter.
+     */
+    if (rawSearch === "") {
+        return plans;
+    }
+
+    /*
+     * GUID and hash searches are special searches and do not
+     * depend on the title/description toggles.
+     */
+    if (isGuidSearch(rawSearch)) {
+        const guid = rawSearch.substring(1);
+
+        return plans.filter(
+            plan => String(plan.guid) === guid
+        );
+    }
+
+    if (isHashSearch(rawSearch)) {
+        const wantedHash = caseSensitive
+            ? rawSearch
+            : rawSearch.toLowerCase();
+
+        return plans.filter(plan => {
+            if (
+                plan.hash === null ||
+                plan.hash === undefined
+            ) {
+                return false;
+            }
+
+            const planHash = String(plan.hash);
+
+            return caseSensitive
+                ? planHash === wantedHash
+                : planHash.toLowerCase() === wantedHash;
+        });
+    }
+
+    /*
+     * If neither Title nor Description is selected,
+     * nothing can match a normal text search.
+     */
+    if (!searchTitle && !searchDescription) {
+        return [];
+    }
+
+    const needle = caseSensitive
+        ? rawSearch
+        : rawSearch.toLocaleLowerCase();
+
+    return plans.filter(plan => {
+        let titleMatches = false;
+        let descriptionMatches = false;
+
+        if (searchTitle) {
+            const title = String(plan.title ?? "");
+
+            titleMatches = caseSensitive
+                ? title.includes(needle)
+                : title.toLocaleLowerCase().includes(needle);
+        }
+
+        if (searchDescription) {
+            const description = String(plan.description ?? "");
+
+            descriptionMatches = caseSensitive
+                ? description.includes(needle)
+                : description.toLocaleLowerCase().includes(needle);
+        }
+
+        return titleMatches || descriptionMatches;
+    });
+}
+
+
+
+
+/*
+ * ============================================================
+ * Results rendering
+ * ============================================================
+ */
+
+function renderResults() {
+    const plans = getFilteredPlans();
+
+    resultsHeader.textContent =
+        `${plans.length.toLocaleString()} ` +
+        `${plans.length === 1 ? "plan" : "plans"}`;
+
+    if (plans.length === 0) {
+        resultsElement.innerHTML = `
+            <div class="empty">
+                No plans found.
+            </div>
+        `;
+
+        return;
+    }
+
+    /*
+     * Category -> plans
+     */
+    const groups = new Map();
+
+    for (const plan of plans) {
+        if (!groups.has(plan.category)) {
+            groups.set(plan.category, []);
+        }
+
+        groups.get(plan.category).push(plan);
+    }
+
+    const fragment = document.createDocumentFragment();
+
+    for (const [category, categoryPlans] of groups) {
+        const categoryElement =
+            document.createElement("div");
+
+        categoryElement.className = "category";
+
+        const categoryName =
+            document.createElement("div");
+
+        categoryName.className = "category-name";
+        categoryName.textContent = category;
+
+        categoryElement.appendChild(
+            categoryName
+        );
+
+        const planList =
+            document.createElement("div");
+
+        planList.className = "plan-list";
+
+        for (const plan of categoryPlans) {
+            const button =
+                document.createElement("button");
+
+            button.className = "plan-item";
+
+            if (
+                state.selectedGuid !== null &&
+                String(state.selectedGuid) === String(plan.guid)
+            ) {
+                button.classList.add("selected");
+            }
+
+            button.dataset.guid = String(plan.guid);
+
+
+const characterIcon = getCharacterIcon(
+    plan.character
+);
+
+button.innerHTML = `
+    <div class="plan-title">
+        <span class="plan-title-text">
+            ${escapeHtml(plan.title)}
+        </span>
+
+        ${
+            characterIcon
+                ? `
+                    <img
+                        class="character-icon"
+                        src="${escapeHtml(characterIcon)}"
+                        alt="${escapeHtml(plan.character)}"
+                        title="${escapeHtml(plan.character)}"
+                    >
+                `
+                : ""
+        }
+    </div>
+
+    <div class="plan-guid">
+        g${escapeHtml(plan.guid)}
+    </div>
+`;
+
+
+
+            button.addEventListener(
+                "click",
+                () => selectPlan(plan)
+            );
+
+            planList.appendChild(button);
+        }
+
+        categoryElement.appendChild(planList);
+        fragment.appendChild(categoryElement);
+    }
+
+    resultsElement.replaceChildren(fragment);
+}
+
+
+/*
+ * ============================================================
+ * Icon resolution
+ * ============================================================
+ */
+
+/*
+ * Icon resolution:
+ *
+ * 1. No icon_guid:
+ *      plan_has_no_icon.png
+ *
+ * 2. icon_guid exists but isn't present in texture_guids.json:
+ *      missing_icon_guid_in_texture_guids_json.png
+ *
+ * 3. icon_guid maps to a SHA1:
+ *      plan_icons/<sha1>.png
+ *
+ * 4. If that actual PNG doesn't exist:
+ *      missing_texture.png
+ */
+function getIconFilename(plan) {
+    if (
+        plan.iconGuid === null ||
+        plan.iconGuid === undefined ||
+        plan.iconGuid === "" ||
+		plan.iconGuid === 0
+    ) {
+        return "plan_has_no_icon.png";
+    }
+    const key = String(plan.iconGuid);
+
+    if (
+        !Object.prototype.hasOwnProperty.call(
+            state.textureGuids,
+            key
+        )
+    ) {
+        return "missing_icon_guid_in_texture_guids_json.png";
+    }
+
+    const sha1 = state.textureGuids[key];
+
+    if (
+        sha1 === null ||
+        sha1 === undefined ||
+        String(sha1).trim() === ""
+    ) {
+        return "missing_texture.png";
+    }
+
+    return `${String(sha1)}.png`;
+}
+
+function getFallbackIcon() {
+    return planIconPath(
+        "missing_texture.png"
+    );
+}
+
+function getMissingGuidIcon() {
+    return planIconPath(
+        "missing_icon_guid_in_texture_guids_json.png"
+    );
+}
+
+
+/*
+ * ============================================================
+ * Plan details
+ * ============================================================
+ */
+
+async function selectPlan(plan) {
+    state.selectedGuid = plan.guid;
+
+    renderResults();
+
+    const requestId = ++state.detailsRequestId;
+
+    renderDetails(plan, requestId);
+}
+
+function renderDetails(plan, requestId) {
+    const iconFilename = getIconFilename(plan);
+    const primaryIcon = planIconPath(iconFilename);
+
+    detailsElement.innerHTML = `
+        <div class="details">
+
+            <div class="plan-heading">
+
+                <div class="icon-container">
+                    <img
+                        id="planIcon"
+                        src="${escapeHtml(primaryIcon)}"
+                        alt="Plan icon"
+                    >
+                </div>
+
+                <div class="heading-text">
+                    <h2>${escapeHtml(plan.title)}</h2>
+
+                    <div class="heading-category">
+                        ${escapeHtml(plan.category)}
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="description">
+                ${escapeHtml(plan.description)}
+            </div>
+
+            <div class="metadata">
+
+                ${metadataRow(
+                    "Title",
+                    plan.title
+                )}
+
+                ${metadataRow(
+                    "Description",
+                    plan.description
+                )}
+
+                ${metadataRow(
+                    "Category",
+                    plan.category
+                )}
+
+                ${metadataRow(
+                    "Creator",
+                    plan.creator
+                )}
+
+
+				${metadataRow(
+					"Character",
+					plan.character
+				)}
+
+
+
+                ${metadataRow(
+                    "File path",
+                    plan.filePath
+                )}
+
+                ${metadataRow(
+                    "GUID",
+                    `g${plan.guid}`
+                )}
+
+                ${metadataRow(
+                    "Hash",
+                    plan.hash
+                )}
+
+                ${metadataRow(
+                    "Timestamp",
+                    plan.timestamp
+                )}
+
+                ${metadataRow(
+                    "Size",
+                    formatSize(plan.size) +
+                    (
+                        plan.size !== null &&
+                        plan.size !== undefined &&
+                        plan.size !== ""
+                            ? ` (${plan.size} bytes)`
+                            : ""
+                    )
+                )}
+
+            </div>
+
+        </div>
+    `;
+
+    /*
+     * If we have an actual texture-derived icon, check whether
+     * the PNG exists. If it doesn't, use missing_texture.png.
+     *
+     * This also prevents a broken image icon from appearing.
+     */
+    if (
+        plan.iconGuid !== null &&
+        plan.iconGuid !== undefined &&
+        plan.iconGuid !== "" &&
+        Object.prototype.hasOwnProperty.call(
+            state.textureGuids,
+            String(plan.iconGuid)
+        )
+    ) {
+        const img = $("planIcon");
+
+        img.addEventListener(
+            "error",
+            () => {
+                if (
+                    requestId !== state.detailsRequestId
+                ) {
+                    return;
+                }
+
+                img.onerror = null;
+                img.src = getFallbackIcon();
+            },
+            { once: true }
+        );
+    }
+}
+
+function metadataRow(key, value) {
+    return `
+        <div class="metadata-row">
+            <div class="metadata-key">
+                ${escapeHtml(key)}
+            </div>
+
+            <div class="metadata-value">
+                ${escapeHtml(
+                    value === null ||
+                    value === undefined
+                        ? ""
+                        : value
+                )}
+            </div>
+        </div>
+    `;
+}
+
+
+/*
+ * ============================================================
+ * Event handlers
+ * ============================================================
+ */
+
+gameSelect.addEventListener(
+    "change",
+    async () => {
+        try {
+            state.selectedGuid = null;
+
+            detailsElement.innerHTML = `
+                <div class="details-placeholder">
+                    Select a plan to view its details.
+                </div>
+            `;
+
+            await loadGame(
+                gameSelect.value
+            );
+        } catch (error) {
+            showError(error);
+        }
+    }
+);
+
+
+characterSelect.addEventListener(
+    "change",
+    () => {
+        renderResults();
+    }
+);
+
+
+
+languageSelect.addEventListener(
+    "change",
+    async () => {
+        try {
+            state.language =
+                languageSelect.value;
+
+            setLoading(
+                "Changing language...",
+                state.language
+            );
+
+            await loadTranslations();
+            await preparePlans();
+
+            populateCategoryFilter();
+            renderResults();
+
+            /*
+             * Refresh the selected plan if there is one.
+             */
+            if (state.selectedGuid !== null) {
+                const selected =
+                    state.plans.find(
+                        plan =>
+                            String(plan.guid) ===
+                            String(state.selectedGuid)
+                    );
+
+                if (selected) {
+                    renderDetails(
+                        selected,
+                        ++state.detailsRequestId
+                    );
+                }
+            }
+
+            setStatus(
+                `${state.gameName} — ` +
+                `${state.plans.length.toLocaleString()} plans`
+            );
+
+            hideLoading();
+        } catch (error) {
+            showError(error);
+        }
+    }
+);
+
+searchInput.addEventListener(
+    "input",
+    () => {
+        renderResults();
+    }
+);
+
+categorySelect.addEventListener(
+    "change",
+    () => {
+        renderResults();
+    }
+);
+
+caseSensitiveInput.addEventListener(
+    "change",
+    () => {
+        renderResults();
+    }
+);
+
+
+/*
+ * ============================================================
+ * Error handling
+ * ============================================================
+ */
+
+function showError(error) {
+    console.error(error);
+
+    loadingElement.style.display = "none";
+
+    resultsElement.innerHTML = `
+        <div class="error">
+            ${escapeHtml(
+                error instanceof Error
+                    ? error.message
+                    : String(error)
+            )}
+        </div>
+    `;
+
+    detailsElement.innerHTML = `
+        <div class="error">
+            An error occurred while loading the game data.
+        </div>
+    `;
+
+    setStatus("Error");
+}
+
+
+/*
+ * ============================================================
+ * Startup
+ * ============================================================
+ */
+
+async function start() {
+    try {
+        setLoading(
+            "Loading SQLite engine...",
+            "Initializing sql.js"
+        );
+
+        state.sql = await initSqlJs({
+            locateFile: file =>
+                SQL_WASM_PATH + file
+        });
+
+        setLoading(
+            "Loading game list...",
+            PATHS.gamesList
+        );
+
+        const games = await loadGamesList();
+
+        gameSelect.value = games[0];
+
+        await loadGame(
+            games[0]
+        );
+
+    } catch (error) {
+        showError(error);
+    }
+}
+
+start();
+
+</script>
+
+</body>
+</html>
