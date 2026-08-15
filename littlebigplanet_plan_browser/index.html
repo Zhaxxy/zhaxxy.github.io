@@ -1578,15 +1578,15 @@ button.innerHTML = `
  * 4. If that actual PNG doesn't exist:
  *      missing_texture.png
  */
-function getIconFilename(plan) {
+function getRemoteIconUrl(plan) {
     if (
         plan.iconGuid === null ||
         plan.iconGuid === undefined ||
-        plan.iconGuid === "" ||
-		plan.iconGuid === 0
+        plan.iconGuid === ""
     ) {
-        return "plan_has_no_icon.png";
+        return null;
     }
+
     const key = String(plan.iconGuid);
 
     if (
@@ -1595,20 +1595,27 @@ function getIconFilename(plan) {
             key
         )
     ) {
-        return "missing_icon_guid_in_texture_guids_json.png";
+        return null;
     }
 
-    const sha1 = state.textureGuids[key];
+    const hash = state.textureGuids[key];
 
     if (
-        sha1 === null ||
-        sha1 === undefined ||
-        String(sha1).trim() === ""
+        hash === null ||
+        hash === undefined ||
+        String(hash).trim() === ""
     ) {
-        return "missing_texture.png";
+        return null;
     }
 
-    return `${String(sha1)}.png`;
+    return (
+        "https://archive.org/download/" +
+        "lbp3_ps4_1_28_plan_icon_pngs/" +
+        "lbp3_ps4_1_28_plan_icon_pngs.zip/" +
+		"plan_icons%2F" +
+        encodeURIComponent(String(hash)) +
+        ".png"
+    );
 }
 
 function getFallbackIcon() {
@@ -1637,12 +1644,35 @@ async function selectPlan(plan) {
 
     const requestId = ++state.detailsRequestId;
 
-    renderDetails(plan, requestId);
+    await renderDetails(plan, requestId);
 }
 
-function renderDetails(plan, requestId) {
-    const iconFilename = getIconFilename(plan);
-    const primaryIcon = planIconPath(iconFilename);
+async function renderDetails(plan, requestId) {
+    /*
+     * Determine the remote icon URL.
+     */
+    const remoteIconUrl = getRemoteIconUrl(plan);
+
+    /*
+     * If there is no valid texture GUID mapping, we can
+     * immediately use the appropriate missing-GUID icon.
+     */
+    let initialIcon = null;
+
+    if (!remoteIconUrl) {
+        const hasTextureMapping =
+            plan.iconGuid !== null &&
+            plan.iconGuid !== undefined &&
+            plan.iconGuid !== "" &&
+            Object.prototype.hasOwnProperty.call(
+                state.textureGuids,
+                String(plan.iconGuid)
+            );
+
+        if (!hasTextureMapping) {
+            initialIcon = getMissingGuidIcon();
+        }
+    }
 
     detailsElement.innerHTML = `
         <div class="details">
@@ -1652,8 +1682,11 @@ function renderDetails(plan, requestId) {
                 <div class="icon-container">
                     <img
                         id="planIcon"
-                        src="${escapeHtml(primaryIcon)}"
                         alt="Plan icon"
+                        ${initialIcon
+                            ? `src="${escapeHtml(initialIcon)}"`
+                            : ""
+                        }
                     >
                 </div>
 
@@ -1673,53 +1706,16 @@ function renderDetails(plan, requestId) {
 
             <div class="metadata">
 
-                ${metadataRow(
-                    "Title",
-                    plan.title
-                )}
-
-                ${metadataRow(
-                    "Description",
-                    plan.description
-                )}
-
-                ${metadataRow(
-                    "Category",
-                    plan.category
-                )}
-
-                ${metadataRow(
-                    "Creator",
-                    plan.creator
-                )}
-
-
-				${metadataRow(
-					"Character",
-					plan.character
-				)}
-
-
-
-                ${metadataRow(
-                    "File path",
-                    plan.filePath
-                )}
-
-                ${metadataRow(
-                    "GUID",
-                    `g${plan.guid}`
-                )}
-
-                ${metadataRow(
-                    "Hash",
-                    plan.hash
-                )}
-
-                ${metadataRow(
-                    "Timestamp",
-                    plan.timestamp
-                )}
+                ${metadataRow("Title", plan.title)}
+                ${metadataRow("Description", plan.description)}
+                ${metadataRow("Category", plan.category)}
+                ${metadataRow("Creator", plan.creator)}
+                ${metadataRow("Character", plan.character)}
+                ${metadataRow("File path", plan.filePath)}
+                ${metadataRow("GUID", `g${plan.guid}`)}
+				${metadataRow("Icon GUID", `g${plan.iconGuid}`)}
+                ${metadataRow("Hash", plan.hash)}
+                ${metadataRow("Timestamp", plan.timestamp)}
 
                 ${metadataRow(
                     "Size",
@@ -1739,36 +1735,72 @@ function renderDetails(plan, requestId) {
     `;
 
     /*
-     * If we have an actual texture-derived icon, check whether
-     * the PNG exists. If it doesn't, use missing_texture.png.
-     *
-     * This also prevents a broken image icon from appearing.
+     * There is no remote icon to load.
      */
-    if (
-        plan.iconGuid !== null &&
-        plan.iconGuid !== undefined &&
-        plan.iconGuid !== "" &&
-        Object.prototype.hasOwnProperty.call(
-            state.textureGuids,
-            String(plan.iconGuid)
-        )
-    ) {
+    if (!remoteIconUrl) {
+        return;
+    }
+
+    try {
+        const response = await fetch(remoteIconUrl, {
+            method: "GET"
+        });
+
+        /*
+         * The user may have selected another plan while this
+         * request was running.
+         */
+        if (requestId !== state.detailsRequestId) {
+            return;
+        }
+
         const img = $("planIcon");
 
-        img.addEventListener(
-            "error",
-            () => {
-                if (
-                    requestId !== state.detailsRequestId
-                ) {
-                    return;
-                }
+        if (!img) {
+            return;
+        }
 
+        /*
+         * Successful request.
+         */
+        if (response.ok) {
+            img.src = remoteIconUrl;
+
+            /*
+             * In case the image itself fails to load after the
+             * fetch succeeds.
+             */
+            img.onerror = () => {
                 img.onerror = null;
                 img.src = getFallbackIcon();
-            },
-            { once: true }
+            };
+
+            return;
+        }
+
+        /*
+         * 503 or any other HTTP failure.
+         */
+        img.src = getFallbackIcon();
+
+    } catch (error) {
+        /*
+         * Network/CORS/etc. failure.
+         */
+        console.warn(
+            "Could not load remote plan icon:",
+            error
         );
+
+        if (requestId !== state.detailsRequestId) {
+            return;
+        }
+
+        const img = $("planIcon");
+
+        if (img) {
+            img.src = getFallbackIcon();
+        }
     }
 }
 
@@ -1859,7 +1891,7 @@ languageSelect.addEventListener(
                     );
 
                 if (selected) {
-                    renderDetails(
+                    await renderDetails(
                         selected,
                         ++state.detailsRequestId
                     );
