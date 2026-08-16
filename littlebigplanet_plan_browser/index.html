@@ -1752,7 +1752,7 @@ async function renderDetails(plan, requestId) {
                 ${metadataRow("GUID", `g${plan.guid}`)}
 				${metadataRow("Icon GUID", `g${plan.iconGuid}`)}
                 ${metadataRow("Hash", plan.hash)}
-                ${metadataRow("Timestamp", plan.timestamp)}
+                ${metadataRow("Timestamp", formatTimestamp(plan.timestamp))}
 
                 ${metadataRow(
                     "Size",
@@ -1880,6 +1880,71 @@ detailsElement
             img.src = getFallbackIcon();
         }
     }
+}
+
+function formatTimestamp(timestamp) {
+    if (
+        timestamp === null ||
+        timestamp === undefined ||
+        String(timestamp).trim() === ""
+    ) {
+        return "";
+    }
+
+    const original = String(timestamp);
+    const date = new Date(original);
+
+    if (Number.isNaN(date.getTime())) {
+        return original;
+    }
+
+    const day = date.getDate();
+
+    // Ordinal suffix: 1st, 2nd, 3rd, 4th, 11th, 12th, 13th, etc.
+    let suffix = "th";
+
+    if (day % 100 < 11 || day % 100 > 13) {
+        switch (day % 10) {
+            case 1:
+                suffix = "st";
+                break;
+            case 2:
+                suffix = "nd";
+                break;
+            case 3:
+                suffix = "rd";
+                break;
+        }
+    }
+
+    const weekday = new Intl.DateTimeFormat(undefined, {
+        weekday: "long"
+    }).format(date);
+
+    const month = new Intl.DateTimeFormat(undefined, {
+        month: "long"
+    }).format(date);
+
+    const year = new Intl.DateTimeFormat(undefined, {
+        year: "numeric"
+    }).format(date);
+
+    const formattedDate =
+        `${weekday} ${day}${suffix} ${month} ${year}`;
+
+    const timePart = new Intl.DateTimeFormat(undefined, {
+        hour: "numeric",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: true
+    }).format(date);
+
+    const formattedTime = timePart
+        .replace(/\s?(AM|PM)$/i, match =>
+            match.trim().toLowerCase()
+        );
+
+    return `${formattedDate} ${formattedTime} (${original})`;
 }
 
 function metadataRow(key, value, options = {}) {
