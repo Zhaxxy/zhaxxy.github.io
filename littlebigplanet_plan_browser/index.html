@@ -414,6 +414,45 @@
             flex-direction: column;
         }
     }
+.metadata-value-with-button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.metadata-value-with-button .metadata-text {
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.copy-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    flex: 0 0 auto;
+    padding: 5px 9px;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    background: var(--input);
+    color: var(--text);
+    font-size: 12px;
+}
+
+.copy-icon {
+    width: 14px;
+    height: 14px;
+    flex: 0 0 auto;
+}
+
+.copy-button:hover {
+    background: var(--panel-2);
+}
+
+.copy-button.copied {
+    border-color: #4caf50;
+}
 </style>
 
 
@@ -1709,7 +1748,7 @@ async function renderDetails(plan, requestId) {
 				${metadataRow("Popit Type", plan.popitType)}
                 ${metadataRow("Creator", plan.creator)}
                 ${metadataRow("Character", plan.character)}
-                ${metadataRow("File path", plan.filePath)}
+                ${metadataRow("File path", plan.filePath, { copy: true })}
                 ${metadataRow("GUID", `g${plan.guid}`)}
 				${metadataRow("Icon GUID", `g${plan.iconGuid}`)}
                 ${metadataRow("Hash", plan.hash)}
@@ -1731,7 +1770,48 @@ async function renderDetails(plan, requestId) {
 
         </div>
     `;
+detailsElement
+    .querySelectorAll(".copy-button")
+    .forEach(button => {
+        button.addEventListener(
+            "click",
+            async () => {
+                const value =
+                    button.dataset.copyValue ?? "";
 
+                const textElement =
+                    button.querySelector(
+                        ".copy-button-text"
+                    );
+
+                try {
+                    await navigator.clipboard.writeText(
+                        value
+                    );
+
+                    textElement.textContent = "Copied";
+                    button.classList.add("copied");
+
+                    setTimeout(() => {
+                        textElement.textContent = "Copy";
+                        button.classList.remove("copied");
+                    }, 1500);
+
+                } catch (error) {
+                    console.error(
+                        "Could not copy value:",
+                        error
+                    );
+
+                    textElement.textContent = "Failed";
+
+                    setTimeout(() => {
+                        textElement.textContent = "Copy";
+                    }, 1500);
+                }
+            }
+        );
+    });
     /*
      * There is no remote icon to load.
      */
@@ -1802,7 +1882,64 @@ async function renderDetails(plan, requestId) {
     }
 }
 
-function metadataRow(key, value) {
+function metadataRow(key, value, options = {}) {
+    const {
+        copy = false,
+        copyValue = value
+    } = options;
+
+    const displayValue =
+        value === null || value === undefined
+            ? ""
+            : String(value);
+
+    const valueHtml = copy
+        ? `
+            <div class="metadata-value-with-button">
+                <span class="metadata-text">
+                    ${escapeHtml(displayValue)}
+                </span>
+
+<button
+    class="copy-button"
+    type="button"
+    data-copy-value="${escapeHtml(
+        copyValue === null ||
+        copyValue === undefined
+            ? ""
+            : String(copyValue)
+    )}"
+>
+    <svg
+        class="copy-icon"
+        viewBox="0 0 24 24"
+        aria-hidden="true"
+    >
+        <rect
+            x="9"
+            y="9"
+            width="11"
+            height="11"
+            rx="2"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+        />
+        <path
+            d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+        />
+    </svg>
+
+    <span class="copy-button-text">Copy</span>
+</button>
+            </div>
+        `
+        : escapeHtml(displayValue);
+
     return `
         <div class="metadata-row">
             <div class="metadata-key">
@@ -1810,12 +1947,7 @@ function metadataRow(key, value) {
             </div>
 
             <div class="metadata-value">
-                ${escapeHtml(
-                    value === null ||
-                    value === undefined
-                        ? ""
-                        : value
-                )}
+                ${valueHtml}
             </div>
         </div>
     `;
