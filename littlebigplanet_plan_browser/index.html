@@ -1598,7 +1598,7 @@ function getRemoteIconUrl(plan) {
         return null;
     }
 
-    const hash = state.textureGuids[key];
+    const [hash,url_starter] = state.textureGuids[key];
 
     if (
         hash === null ||
@@ -1609,10 +1609,7 @@ function getRemoteIconUrl(plan) {
     }
 
     return (
-        "https://archive.org/download/" +
-        "lbp3_ps4_1_28_plan_icon_pngs/" +
-        "lbp3_ps4_1_28_plan_icon_pngs.zip/" +
-		"plan_icons%2F" +
+		url_starter +
         encodeURIComponent(String(hash)) +
         ".png"
     );
