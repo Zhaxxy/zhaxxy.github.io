@@ -1176,7 +1176,7 @@ function getPlanCategory(categoryKey, popitType) {
         return `${String(popitType)} (${getCategory(DEFAULT_CATEGORY_KEY)})`
     }
 
-    return getCategory(categoryKey);
+    return `${getCategory(categoryKey)} (${String(popitType)})`;
 }
 
 function getDescription(descriptionKey) {
