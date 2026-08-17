@@ -28,23 +28,27 @@
         box-sizing: border-box;
     }
 
-    html,
-    body {
-        margin: 0;
-        padding: 0;
-        min-height: 100%;
-    }
+	html,
+	body {
+		width: 100%;
+		min-height: 100%;
+		margin: 0;
+		padding: 0;
+	}
 
-    body {
-        font-family:
-            system-ui,
-            -apple-system,
-            BlinkMacSystemFont,
-            "Segoe UI",
-            sans-serif;
-        background: var(--bg);
-        color: var(--text);
-    }
+
+
+	body {
+		font-family:
+			system-ui,
+			-apple-system,
+			BlinkMacSystemFont,
+			"Segoe UI",
+			sans-serif;
+		background: var(--bg);
+		color: var(--text);
+	}
+
 
     button,
     input,
@@ -69,17 +73,18 @@
         border-color: #505766;
     }
 
-    .app {
-        display: flex;
-        flex-direction: column;
-        min-height: 100vh;
-    }
+	.app {
+		display: flex;
+		flex-direction: column;
+		min-height: 100vh;
+	}
 
-    header {
-        padding: 18px 24px;
-        border-bottom: 1px solid var(--border);
-        background: var(--panel);
-    }
+	header {
+		flex: 0 0 auto;
+		padding: 18px 24px;
+		border-bottom: 1px solid var(--border);
+		background: var(--panel);
+	}
 
     header h1 {
         margin: 0 0 5px;
@@ -91,14 +96,15 @@
         font-size: 13px;
     }
 
-    .toolbar {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-        padding: 14px 24px;
-        border-bottom: 1px solid var(--border);
-        background: var(--panel);
-    }
+	.toolbar {
+		flex: 0 0 auto;
+		display: flex;
+		flex-wrap: wrap;
+		gap: 10px;
+		padding: 14px 24px;
+		border-bottom: 1px solid var(--border);
+		background: var(--panel);
+	}
 
     .toolbar-group {
         display: flex;
@@ -143,23 +149,37 @@
         accent-color: var(--accent);
     }
 
-    main {
-        display: grid;
-        grid-template-columns: minmax(300px, 460px) 1fr;
-        flex: 1;
-        min-height: 0;
-    }
 
-    .results-panel {
-        min-width: 0;
-        border-right: 1px solid var(--border);
-        overflow: auto;
-    }
+	main {
+		display: grid;
+		grid-template-columns: minmax(300px, 460px) 1fr;
+		align-items: start;
+	}
 
-    .details-panel {
-        min-width: 0;
-        overflow: auto;
-    }
+
+
+	/*
+	 * Only the plan list gets its own scrollbar.
+	 */
+	.results-panel {
+		position: sticky;
+		top: 0;
+		height: calc(100vh - 0px);
+		min-width: 0;
+		overflow-y: auto;
+		overflow-x: hidden;
+		border-right: 1px solid var(--border);
+	}
+
+
+	/*
+	 * Details are part of the normal document/page flow.
+	 * Long metadata therefore makes the whole page scroll.
+	 */
+	.details-panel {
+		min-width: 0;
+		overflow: visible;
+	}
 
     .results-header {
         position: sticky;
@@ -238,11 +258,12 @@
         text-align: center;
     }
 
-    .details {
-        max-width: 1000px;
-        margin: 0 auto;
-        padding: 28px;
-    }
+
+	.details {
+		max-width: 1000px;
+		margin: 0 auto;
+		padding: 28px;
+	}
 
     .details-placeholder {
         display: flex;
@@ -379,41 +400,79 @@
         overflow-wrap: anywhere;
     }
 
-    @media (max-width: 800px) {
-        main {
-            grid-template-columns: 1fr;
-        }
-
-        .results-panel {
-            max-height: 45vh;
-            border-right: 0;
-            border-bottom: 1px solid var(--border);
-        }
-
-        #search {
-            width: 100%;
-            min-width: 200px;
-        }
-
-        .toolbar {
-            flex-direction: column;
-            align-items: stretch;
-        }
-
-        .toolbar-group {
-            width: 100%;
-        }
-
-        .toolbar-group select,
-        .toolbar-group input {
-            flex: 1;
-            min-width: 0;
-        }
-
-        .plan-heading {
-            flex-direction: column;
-        }
+@media (max-width: 800px) {
+    main {
+        display: flex;
+        flex-direction: column;
     }
+
+    /*
+     * Metadata/details comes FIRST on mobile.
+     */
+    .details-panel {
+        order: 1;
+        width: 100%;
+        min-height: 0;
+        overflow: visible;
+    }
+
+    /*
+     * Plans browser comes BELOW the metadata.
+     */
+    .results-panel {
+        order: 2;
+
+        position: relative;
+        top: auto;
+
+        width: 100%;
+        height: 45vh;
+        max-height: 45vh;
+
+        overflow-y: auto;
+        overflow-x: hidden;
+
+        border-right: 0;
+        border-bottom: 1px solid var(--border);
+        border-top: 1px solid var(--border);
+    }
+
+    .details {
+        width: 100%;
+        max-width: none;
+        padding: 20px;
+    }
+
+    .toolbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .toolbar-group {
+        width: 100%;
+    }
+
+    .toolbar-group select,
+    .toolbar-group input {
+        flex: 1;
+        width: 100%;
+        min-width: 0;
+    }
+
+    #search {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .plan-heading {
+        flex-direction: column;
+    }
+
+    .icon-container {
+        width: 140px;
+        height: 140px;
+    }
+}
 .metadata-value-with-button {
     display: flex;
     align-items: center;
