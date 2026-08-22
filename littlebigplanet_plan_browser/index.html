@@ -683,7 +683,10 @@
     Case sensitive
 </label>
 
-
+<label class="checkbox">
+    <input id="hideMissingTextureGuids" type="checkbox">
+    Hide missing icon GUIDs
+</label>
 
 </div>
 
@@ -833,7 +836,7 @@ const searchInput = $("search");
 const searchTitleInput = $("searchTitle");
 const searchDescriptionInput = $("searchDescription");
 const caseSensitiveInput = $("caseSensitive");
-
+const hideMissingTextureGuidsInput = $("hideMissingTextureGuids");
 
 const resultsElement = $("results");
 const resultsHeader = $("resultsHeader");
@@ -858,6 +861,22 @@ const CHARACTER_ICONS = {
  * Utility functions
  * ============================================================
  */
+
+function hasTextureGuidMapping(plan) {
+    if (
+        plan.iconGuid === null ||
+        plan.iconGuid === undefined ||
+        plan.iconGuid === ""
+    ) {
+        return false;
+    }
+
+    return Object.prototype.hasOwnProperty.call(
+        state.textureGuids,
+        String(plan.iconGuid)
+    );
+}
+
 
 function updateGroupFilter() {
     const groupBy = groupBySelect.value;
@@ -1652,6 +1671,7 @@ async function preparePlans() {
     /*
      * Sort alphabetically by category and then title.
      */
+	state.plans.reverse()
     state.plans.sort((a, b) => {
         const categoryCompare = compareStrings(
             a.category,
@@ -1718,6 +1738,11 @@ function getFilteredPlans() {
 	
     let plans = state.plans;
 
+    if (hideMissingTextureGuidsInput.checked) {
+        plans = plans.filter(
+            plan => hasTextureGuidMapping(plan)
+        );
+    }
 	
 	if (character !== "") {
 		plans = plans.filter(
@@ -2551,6 +2576,12 @@ caseSensitiveInput.addEventListener(
     }
 );
 
+hideMissingTextureGuidsInput.addEventListener(
+    "change",
+    () => {
+        renderResults();
+    }
+);
 
 /*
  * ============================================================
