@@ -801,6 +801,7 @@ const state = {
      *   texture GUID -> sha1
      */
     textureGuids: {},
+	textureHashToGuids: {},
 
     selectedGuid: null,
 
@@ -1457,6 +1458,11 @@ async function loadTextureGuids() {
     }
 
     state.textureGuids = textureGuids;
+	// value[0] to only get the hash
+	state.textureHashToGuids = Object.entries(textureGuids).reduce((acc, [key, value]) => {
+  (acc[value[0]] ??= []).push(key);
+  return acc;
+}, {});
 }
 
 
@@ -1777,34 +1783,54 @@ function getFilteredPlans() {
      * GUID and hash searches are special searches and do not
      * depend on the title/description toggles.
      */
-    if (isGuidSearch(rawSearch)) {
-        const guid = rawSearch.substring(1);
+	if (isGuidSearch(rawSearch)) {
+		const guid = rawSearch.substring(1);
 
-        return plans.filter(
-            plan => String(plan.guid) === guid
-        );
-    }
+		const try_one = plans.filter(
+			plan => String(plan.guid) === guid
+		);
 
-    if (isHashSearch(rawSearch)) {
-        const wantedHash = caseSensitive
-            ? rawSearch
-            : rawSearch.toLowerCase();
+		if (try_one.length > 0) {
+			return try_one;
+		}
 
-        return plans.filter(plan => {
-            if (
-                plan.hash === null ||
-                plan.hash === undefined
-            ) {
-                return false;
-            }
+		return plans.filter(
+			plan => String(plan.iconGuid) === guid
+		);
+	}
 
-            const planHash = String(plan.hash);
+	if (isHashSearch(rawSearch)) {
+		const wantedHash = caseSensitive
+			? rawSearch
+			: rawSearch.toLowerCase();
 
-            return caseSensitive
-                ? planHash === wantedHash
-                : planHash.toLowerCase() === wantedHash;
-        });
-    }
+		const try_one = plans.filter(plan => {
+			if (
+				plan.hash === null ||
+				plan.hash === undefined
+			) {
+				return false;
+			}
+
+			const planHash = String(plan.hash);
+
+			return caseSensitive
+				? planHash === wantedHash
+				: planHash.toLowerCase() === wantedHash;
+		});
+
+		if (try_one.length > 0) {
+			return try_one;
+		}
+
+		const guids = state.textureHashToGuids[wantedHash];
+
+		if (guids && guids.length > 0) {
+			return plans.filter(
+				plan => guids.includes(String(plan.iconGuid))
+			);
+		}
+	}
 
     /*
      * If neither Title nor Description is selected,
