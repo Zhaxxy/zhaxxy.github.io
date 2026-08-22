@@ -49,6 +49,80 @@
 		color: var(--text);
 	}
 
+	.group-filter-group {
+		position: relative;
+	}
+
+	.searchable-select {
+		position: relative;
+		min-width: 240px;
+	}
+
+	#groupFilterSearch {
+		width: 100%;
+		height: 38px;
+		padding: 0 11px;
+	}
+
+	.searchable-dropdown {
+		position: absolute;
+		left: 0;
+		right: 0;
+		top: calc(100% + 4px);
+		z-index: 50;
+
+		max-height: 320px;
+		overflow-y: auto;
+
+		border: 1px solid var(--border);
+		border-radius: 6px;
+		background: var(--panel);
+		box-shadow: 0 8px 25px rgba(0, 0, 0, 0.35);
+
+		display: none;
+	}
+
+	.searchable-dropdown.open {
+		display: block;
+	}
+
+	.searchable-option {
+		display: block;
+		width: 100%;
+		padding: 9px 11px;
+
+		border: 0;
+		border-radius: 0;
+
+		background: transparent;
+		color: var(--text);
+
+		text-align: left;
+		cursor: pointer;
+	}
+
+	.searchable-option:hover,
+	.searchable-option.selected {
+		background: var(--selected);
+	}
+
+	.searchable-option.all-option {
+		border-bottom: 1px solid var(--border);
+		color: var(--muted);
+	}
+
+	.searchable-no-results {
+		padding: 12px;
+		color: var(--muted);
+		font-size: 13px;
+	}
+
+	@media (max-width: 800px) {
+		.searchable-select {
+			width: 100%;
+			min-width: 0;
+		}
+	}
 
     button,
     input,
@@ -562,12 +636,26 @@
     </select>
 </div>
 
-	<div class="toolbar-group">
-		<label id="groupFilterLabel" for="categorySelect">Category</label>
-		<select id="categorySelect">
-			<option value="">All categories</option>
-		</select>
-	</div>
+<div class="toolbar-group group-filter-group">
+    <label id="groupFilterLabel" for="groupFilterSearch">
+        Category
+    </label>
+
+    <div class="searchable-select" id="groupFilterContainer">
+        <input
+            id="groupFilterSearch"
+            type="search"
+            placeholder="All categories"
+            autocomplete="off"
+            spellcheck="false"
+        >
+
+        <div
+            id="groupFilterDropdown"
+            class="searchable-dropdown"
+        ></div>
+    </div>
+</div>
 
     <div class="toolbar-group" style="flex: 1;">
         <input
@@ -717,7 +805,9 @@ const state = {
      * Used to prevent stale async icon requests from changing
      * the currently displayed plan.
      */
-    detailsRequestId: 0
+    detailsRequestId: 0,
+	
+	groupFilterValue: ""
 };
 
 
@@ -735,7 +825,9 @@ const characterSelect = $("characterSelect");
 const languageSelect = $("languageSelect");
 const groupBySelect = $("groupBySelect");
 const groupFilterLabel = $("groupFilterLabel");
-const categorySelect = $("categorySelect");
+const groupFilterSearch = $("groupFilterSearch");
+const groupFilterContainer = $("groupFilterContainer");
+const groupFilterDropdown = $("groupFilterDropdown");
 const searchInput = $("search");
 
 const searchTitleInput = $("searchTitle");
@@ -770,47 +862,152 @@ const CHARACTER_ICONS = {
 function updateGroupFilter() {
     const groupBy = groupBySelect.value;
 
+    /*
+     * Reset the currently selected filter when changing
+     * between categories and themes.
+     */
+    state.groupFilterValue = "";
+
     if (groupBy === "theme") {
         groupFilterLabel.textContent = "Theme";
-
-        categorySelect.innerHTML =
-            `<option value="">All themes</option>`;
-
-        const themes = [
-            ...new Set(
-                state.plans.map(plan => plan.theme)
-            )
-        ].sort(compareStrings);
-
-        for (const theme of themes) {
-            const option = document.createElement("option");
-
-            option.value = theme;
-            option.textContent = theme;
-
-            categorySelect.appendChild(option);
-        }
-
+        groupFilterSearch.placeholder = "All themes";
     } else {
         groupFilterLabel.textContent = "Category";
+        groupFilterSearch.placeholder = "All categories";
+    }
 
-        categorySelect.innerHTML =
-            `<option value="">All categories</option>`;
+    groupFilterSearch.value = "";
 
-        const categories = [
-            ...new Set(
-                state.plans.map(plan => plan.category)
+    renderGroupFilterOptions();
+}
+
+function getGroupFilterValues() {
+    const groupBy = groupBySelect.value;
+
+    const values = groupBy === "theme"
+        ? state.plans.map(plan => plan.theme)
+        : state.plans.map(plan => plan.category);
+
+    return [
+        ...new Set(
+            values.filter(
+                value =>
+                    value !== null &&
+                    value !== undefined &&
+                    String(value).trim() !== ""
             )
-        ].sort(compareStrings);
+        )
+    ].sort(compareStrings);
+}
 
-        for (const category of categories) {
-            const option = document.createElement("option");
+function renderGroupFilterOptions() {
+    const groupBy = groupBySelect.value;
 
-            option.value = category;
-            option.textContent = category;
+    const search = groupFilterSearch.value
+        .trim()
+        .toLocaleLowerCase();
 
-            categorySelect.appendChild(option);
+    const values = getGroupFilterValues();
+
+    const filteredValues = search === ""
+        ? values
+        : values.filter(value =>
+            String(value)
+                .toLocaleLowerCase()
+                .includes(search)
+        );
+
+    groupFilterDropdown.innerHTML = "";
+
+    /*
+     * "All categories" / "All themes"
+     */
+    const allOption =
+        document.createElement("button");
+
+    allOption.type = "button";
+    allOption.className =
+        "searchable-option all-option";
+
+    allOption.textContent =
+        groupBy === "theme"
+            ? "All themes"
+            : "All categories";
+
+	allOption.addEventListener(
+		"click",
+		() => {
+			state.groupFilterValue = "";
+			groupFilterPreviousValue = "";
+
+			groupFilterSearch.value = "";
+
+			groupFilterDropdown.classList.remove(
+				"open"
+			);
+
+			renderResults();
+		}
+	);
+
+    groupFilterDropdown.appendChild(
+        allOption
+    );
+
+    if (filteredValues.length === 0) {
+        const noResults =
+            document.createElement("div");
+
+        noResults.className =
+            "searchable-no-results";
+
+        noResults.textContent =
+            "No matches found.";
+
+        groupFilterDropdown.appendChild(
+            noResults
+        );
+
+        return;
+    }
+
+    for (const value of filteredValues) {
+        const option =
+            document.createElement("button");
+
+        option.type = "button";
+        option.className =
+            "searchable-option";
+
+        if (value === state.groupFilterValue) {
+            option.classList.add("selected");
         }
+
+        option.textContent = value;
+
+		option.addEventListener(
+			"click",
+			() => {
+				/*
+				 * This is now a real selection, so update the
+				 * saved value.
+				 */
+				state.groupFilterValue = value;
+				groupFilterPreviousValue = value;
+
+				groupFilterSearch.value = value;
+
+				groupFilterDropdown.classList.remove(
+					"open"
+				);
+
+				renderResults();
+			}
+		);
+
+        groupFilterDropdown.appendChild(
+            option
+        );
     }
 }
 
@@ -1513,7 +1710,7 @@ function getFilteredPlans() {
     );
 
 	const groupBy = groupBySelect.value;
-	const groupFilter = categorySelect.value;
+	const groupFilter = state.groupFilterValue;
     const caseSensitive = caseSensitiveInput.checked;
     const searchTitle = searchTitleInput.checked;
     const searchDescription = searchDescriptionInput.checked;
@@ -2201,6 +2398,69 @@ gameSelect.addEventListener(
     }
 );
 
+let groupFilterPreviousValue = "";
+
+groupFilterSearch.addEventListener(
+    "focus",
+    () => {
+        /*
+         * Remember what was selected before the user started
+         * interacting with the dropdown.
+         */
+        groupFilterPreviousValue =
+            state.groupFilterValue;
+
+        /*
+         * Clear the visible input so the user can type a new
+         * search immediately.
+         */
+        groupFilterSearch.value = "";
+
+        renderGroupFilterOptions();
+
+        groupFilterDropdown.classList.add("open");
+    }
+);
+
+groupFilterSearch.addEventListener(
+    "input",
+    () => {
+        /*
+         * Typing only filters the dropdown.
+         * It does NOT change the actual selected filter.
+         */
+        renderGroupFilterOptions();
+
+        groupFilterDropdown.classList.add("open");
+    }
+);
+
+document.addEventListener(
+    "click",
+    event => {
+        if (
+            !groupFilterContainer.contains(
+                event.target
+            )
+        ) {
+            /*
+             * The user clicked away without selecting
+             * anything, so restore the previous selection.
+             */
+            state.groupFilterValue =
+                groupFilterPreviousValue;
+
+            groupFilterSearch.value =
+                groupFilterPreviousValue;
+
+            groupFilterDropdown.classList.remove(
+                "open"
+            );
+
+            renderResults();
+        }
+    }
+);
 
 groupBySelect.addEventListener(
     "change",
@@ -2282,12 +2542,7 @@ searchInput.addEventListener(
     }
 );
 
-categorySelect.addEventListener(
-    "change",
-    () => {
-        renderResults();
-    }
-);
+
 
 caseSensitiveInput.addEventListener(
     "change",
