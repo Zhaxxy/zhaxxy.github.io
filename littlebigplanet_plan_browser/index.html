@@ -554,12 +554,20 @@
         <select id="languageSelect"></select>
     </div>
 
-    <div class="toolbar-group">
-        <label for="categorySelect">Category</label>
-        <select id="categorySelect">
-            <option value="">All categories</option>
-        </select>
-    </div>
+<div class="toolbar-group">
+    <label for="groupBySelect">Group by</label>
+    <select id="groupBySelect">
+        <option value="category">Categories</option>
+        <option value="theme">Themes</option>
+    </select>
+</div>
+
+	<div class="toolbar-group">
+		<label id="groupFilterLabel" for="categorySelect">Category</label>
+		<select id="categorySelect">
+			<option value="">All categories</option>
+		</select>
+	</div>
 
     <div class="toolbar-group" style="flex: 1;">
         <input
@@ -655,6 +663,7 @@ const PATHS = {
  */
 const DEFAULT_TITLE_KEY = "810378753";
 const DEFAULT_CATEGORY_KEY = "3309406048";
+const DEFAULT_THEME_KEY = "1647223365";
 
 
 const CHARACTER_MASK = 0x03E00000;
@@ -724,6 +733,8 @@ const gameSelect = $("gameSelect");
 
 const characterSelect = $("characterSelect");
 const languageSelect = $("languageSelect");
+const groupBySelect = $("groupBySelect");
+const groupFilterLabel = $("groupFilterLabel");
 const categorySelect = $("categorySelect");
 const searchInput = $("search");
 
@@ -756,6 +767,52 @@ const CHARACTER_ICONS = {
  * ============================================================
  */
 
+function updateGroupFilter() {
+    const groupBy = groupBySelect.value;
+
+    if (groupBy === "theme") {
+        groupFilterLabel.textContent = "Theme";
+
+        categorySelect.innerHTML =
+            `<option value="">All themes</option>`;
+
+        const themes = [
+            ...new Set(
+                state.plans.map(plan => plan.theme)
+            )
+        ].sort(compareStrings);
+
+        for (const theme of themes) {
+            const option = document.createElement("option");
+
+            option.value = theme;
+            option.textContent = theme;
+
+            categorySelect.appendChild(option);
+        }
+
+    } else {
+        groupFilterLabel.textContent = "Category";
+
+        categorySelect.innerHTML =
+            `<option value="">All categories</option>`;
+
+        const categories = [
+            ...new Set(
+                state.plans.map(plan => plan.category)
+            )
+        ].sort(compareStrings);
+
+        for (const category of categories) {
+            const option = document.createElement("option");
+
+            option.value = category;
+            option.textContent = category;
+
+            categorySelect.appendChild(option);
+        }
+    }
+}
 
 function getCharacterIcon(character) {
     const filename = CHARACTER_ICONS[character];
@@ -1086,7 +1143,7 @@ async function loadGame(gameId) {
 
     await preparePlans();
 
-    populateCategoryFilter();
+    updateGroupFilter();
     renderResults();
 
     setStatus(
@@ -1217,7 +1274,7 @@ function translationForKey(key) {
         );
     }
 
-    return "MISSING_TRANS_KEY";
+    return null;
 }
 
 function getTitle(titleKey) {
@@ -1252,6 +1309,29 @@ function getCategory(categoryKey) {
     );
 }
 
+function getTheme(themeKey,categoryKey, popitType) {
+    /*
+     * A null/empty theme_key defaults to 1647223365.
+     */
+    if (
+        themeKey === null ||
+        themeKey === undefined ||
+        themeKey === ""
+    ) {
+        return (
+            `${getPlanCategory(categoryKey, popitType)} ${translationForKey(DEFAULT_THEME_KEY) ??"MISSING_TRANS_KEY"}`
+        );
+    }
+
+	if (!translationForKey(DEFAULT_THEME_KEY)) {
+		return `${getPlanCategory(categoryKey, popitType)} (MISSING_TRANS_KEY)`
+	}
+
+    return (
+        translationForKey(themeKey) ??
+        "MISSING_TRANS_KEY"
+    );
+}
 
 function getPlanCategory(categoryKey, popitType) {
     /*
@@ -1303,20 +1383,21 @@ async function preparePlans() {
     );
 
     const result = state.db.exec(`
-        SELECT
-            guid,
-            file_path,
-            timestamp,
-            size,
-            hash,
-            icon_guid,
-            title_key,
-            description_key,
-            category_key,
-            creator,
+		SELECT
+			guid,
+			file_path,
+			timestamp,
+			size,
+			hash,
+			icon_guid,
+			title_key,
+			description_key,
+			category_key,
+			theme_key,
+			creator,
 			sub_type,
 			popit_type
-        FROM plans
+		FROM plans
     `);
 
     const rows = result.length
@@ -1324,47 +1405,51 @@ async function preparePlans() {
         : [];
 
     state.plans = rows.map(row => {
-        const [
-            guid,
-            filePath,
-            timestamp,
-            size,
-            hash,
-            iconGuid,
-            titleKey,
-            descriptionKey,
-            categoryKey,
-            creator,
+		const [
+			guid,
+			filePath,
+			timestamp,
+			size,
+			hash,
+			iconGuid,
+			titleKey,
+			descriptionKey,
+			categoryKey,
+			themeKey,
+			creator,
 			sub_type,
 			popitType
-        ] = row;
+		] = row;
 
-        const title = getTitle(titleKey);
-        const description = getDescription(descriptionKey);
-        const category = getPlanCategory(categoryKey,popitType);
+		const title = getTitle(titleKey);
+		const description = getDescription(descriptionKey);
+		const category = getPlanCategory(categoryKey, popitType);
+		const theme = getTheme(themeKey,categoryKey, popitType);
 		const character = getCharacterFromSubType(sub_type);
-		
-        return {
-            guid,
-            filePath,
-            timestamp,
-            size,
-            hash,
-            iconGuid,
-            titleKey,
-            descriptionKey,
-            categoryKey,
-            creator,
 
-            title,
-            description,
-            category,
-			
+		return {
+			guid,
+			filePath,
+			timestamp,
+			size,
+			hash,
+			iconGuid,
+			titleKey,
+			descriptionKey,
+			categoryKey,
+			themeKey,
+			creator,
+
+			title,
+			description,
+			category,
+			theme,
+
 			character,
-			
+
 			sub_type,
 			popitType,
-        };
+		};
     });
 
     /*
@@ -1427,7 +1512,8 @@ function getFilteredPlans() {
         searchInput.value
     );
 
-    const category = categorySelect.value;
+	const groupBy = groupBySelect.value;
+	const groupFilter = categorySelect.value;
     const caseSensitive = caseSensitiveInput.checked;
     const searchTitle = searchTitleInput.checked;
     const searchDescription = searchDescriptionInput.checked;
@@ -1447,11 +1533,15 @@ function getFilteredPlans() {
     /*
      * Category filtering is independent of search.
      */
-    if (category !== "") {
-        plans = plans.filter(
-            plan => plan.category === category
-        );
-    }
+	if (groupFilter !== "") {
+		plans = plans.filter(plan => {
+			if (groupBy === "theme") {
+				return plan.theme === groupFilter;
+			}
+
+			return plan.category === groupFilter;
+		});
+	}
 
     /*
      * No search text means return everything matching
@@ -1559,15 +1649,22 @@ function renderResults() {
     /*
      * Category -> plans
      */
-    const groups = new Map();
+	const groupBy = groupBySelect.value;
 
-    for (const plan of plans) {
-        if (!groups.has(plan.category)) {
-            groups.set(plan.category, []);
-        }
+	const groups = new Map();
 
-        groups.get(plan.category).push(plan);
-    }
+	for (const plan of plans) {
+		const groupName =
+			groupBy === "theme"
+				? plan.theme
+				: plan.category;
+
+		if (!groups.has(groupName)) {
+			groups.set(groupName, []);
+		}
+
+		groups.get(groupName).push(plan);
+	}
 
     const fragment = document.createDocumentFragment();
 
@@ -2105,6 +2202,21 @@ gameSelect.addEventListener(
 );
 
 
+groupBySelect.addEventListener(
+    "change",
+    () => {
+        /*
+         * Change the filter from Category <-> Theme.
+         */
+        updateGroupFilter();
+
+        /*
+         * Re-render the plans using the new grouping.
+         */
+        renderResults();
+    }
+);
+
 characterSelect.addEventListener(
     "change",
     () => {
@@ -2129,7 +2241,7 @@ languageSelect.addEventListener(
             await loadTranslations();
             await preparePlans();
 
-            populateCategoryFilter();
+            updateGroupFilter();
             renderResults();
 
             /*
