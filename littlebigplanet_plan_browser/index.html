@@ -559,6 +559,20 @@
     overflow-wrap: anywhere;
 }
 
+.metadata-value-with-character {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
+}
+
+.metadata-character-icon {
+    width: 20px;
+    height: 20px;
+    flex: 0 0 auto;
+    object-fit: contain;
+}
+
 .copy-button {
     display: inline-flex;
     align-items: center;
@@ -2152,7 +2166,9 @@ async function renderDetails(plan, requestId) {
 				${metadataRow("Theme", plan.theme)}
 				${metadataRow("Popit Type", plan.popitType)}
                 ${metadataRow("Creator", plan.creator)}
-                ${metadataRow("Character", plan.character)}
+				${metadataRow("Character", plan.character, {
+					characterIcon: getCharacterIcon(plan.character)
+				})}
                 ${metadataRow("File path", plan.filePath, { copy: true })}
                 ${metadataRow("GUID", `g${plan.guid}`)}
                 ${metadataRow("Hash", plan.hash)}
@@ -2354,7 +2370,8 @@ function formatTimestamp(timestamp) {
 function metadataRow(key, value, options = {}) {
     const {
         copy = false,
-        copyValue = value
+        copyValue = value,
+        characterIcon = null
     } = options;
 
     const displayValue =
@@ -2362,52 +2379,66 @@ function metadataRow(key, value, options = {}) {
             ? ""
             : String(value);
 
-    const valueHtml = copy
-        ? `
-            <div class="metadata-value-with-button">
-                <span class="metadata-text">
-                    ${escapeHtml(displayValue)}
-                </span>
+    const valueHtml = characterIcon
+		? `
+			<div class="metadata-value-with-character">
+				<span class="metadata-text">
+					${escapeHtml(displayValue)}
+				</span>
+				<img
+					class="metadata-character-icon"
+					src="${escapeHtml(characterIcon)}"
+					alt="${escapeHtml(displayValue)}"
+					title="${escapeHtml(displayValue)}"
+				>
+			</div>
+		`
+        : copy
+            ? `
+                <div class="metadata-value-with-button">
+                    <span class="metadata-text">
+                        ${escapeHtml(displayValue)}
+                    </span>
 
-<button
-    class="copy-button"
-    type="button"
-    data-copy-value="${escapeHtml(
-        copyValue === null ||
-        copyValue === undefined
-            ? ""
-            : String(copyValue)
-    )}"
->
-    <svg
-        class="copy-icon"
-        viewBox="0 0 24 24"
-        aria-hidden="true"
-    >
-        <rect
-            x="9"
-            y="9"
-            width="11"
-            height="11"
-            rx="2"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-        />
-        <path
-            d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-        />
-    </svg>
+                    <button
+                        class="copy-button"
+                        type="button"
+                        data-copy-value="${escapeHtml(
+                            copyValue === null ||
+                            copyValue === undefined
+                                ? ""
+                                : String(copyValue)
+                        )}"
+                    >
+                        <svg
+                            class="copy-icon"
+                            viewBox="0 0 24 24"
+                            aria-hidden="true"
+                        >
+                            <rect
+                                x="9"
+                                y="9"
+                                width="11"
+                                height="11"
+                                rx="2"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                            />
+                            <path
+                                d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                            />
+                        </svg>
 
-    <span class="copy-button-text">Copy</span>
-</button>
-            </div>
-        `
-        : escapeHtml(displayValue);
+                        <span class="copy-button-text">Copy</span>
+                    </button>
+                </div>
+            `
+            : escapeHtml(displayValue);
 
     return `
         <div class="metadata-row">
