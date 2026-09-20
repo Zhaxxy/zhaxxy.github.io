@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LBP Bin Browser (Levels) frontend entirely by DeepSeek</title>
+<style>
+  :root{
+    --bg:#14161c; --panel:#1c1f28; --panel2:#232733; --border:#323848;
+    --text:#e6e9f0; --muted:#9aa3b8; --accent:#6ea8fe; --accent2:#f5c451;
+    --ok:#5fd38d; --bad:#ff7a7a;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;display:flex;flex-direction:column;height:100vh;overflow:hidden;
+    background:var(--bg);color:var(--text);
+    font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  a{color:var(--accent);text-decoration:none;}
+  a:hover{text-decoration:underline;}
+
+  header{
+    flex:0 0 auto;display:flex;align-items:center;gap:18px;flex-wrap:wrap;
+    padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--border);
+  }
+  header h1{font-size:15px;margin:0;font-weight:600;letter-spacing:.4px;white-space:nowrap;}
+  header h1 b{color:var(--accent);font-weight:600;}
+  #gameTitle{color:var(--muted);font-size:12px;letter-spacing:.4px;text-transform:uppercase;}
+  .controls{display:flex;gap:16px;margin-left:auto;flex-wrap:wrap;}
+  .controls label{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.6px;}
+
+  select,input[type=text]{
+    background:var(--panel2);color:var(--text);border:1px solid var(--border);
+    border-radius:6px;padding:5px 8px;font:inherit;font-size:13px;outline:none;
+  }
+  select:focus,input[type=text]:focus{border-color:var(--accent);}
+  select{max-width:260px;}
+
+  #app{flex:1 1 auto;display:flex;min-height:0;}
+
+  /* ---------- sidebar ---------- */
+  #sidebar{
+    flex:0 0 340px;width:340px;min-height:0;display:flex;flex-direction:column;
+    background:var(--panel);border-right:1px solid var(--border);
+  }
+  .side-top{flex:0 0 auto;padding:10px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:8px;}
+  .search-row{display:flex;gap:8px;}
+  .search-row input[type=text]{flex:1 1 auto;min-width:0;}
+  .toggle-row{display:flex;gap:14px;font-size:12px;color:var(--muted);}
+  .toggle-row label{display:flex;align-items:center;gap:5px;cursor:pointer;user-select:none;}
+  .toggle-row input{accent-color:var(--accent);}
+
+  #results{flex:1 1 auto;overflow-y:auto;padding:6px 0 24px;}
+  .group-block{margin-bottom:2px;}
+  .group-header{
+    display:flex;align-items:center;gap:8px;cursor:pointer;
+    padding:6px 12px;font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;
+    color:var(--accent2);background:#191c24;border-top:1px solid #262b38;border-bottom:1px solid #262b38;
+  }
+  .group-header:hover{background:#20242f;}
+  .group-header.active{background:#243044;}
+  .group-header .group-count{
+    margin-left:auto;font-weight:500;color:var(--muted);background:var(--panel2);
+    border-radius:9px;padding:0 7px;font-size:10px;letter-spacing:0;
+  }
+  .level-item{
+    padding:6px 12px 6px 22px;cursor:pointer;font-size:13px;
+    border-left:2px solid transparent;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  .level-item:hover{background:#20242f;}
+  .level-item.active{background:#243044;border-left-color:var(--accent);color:#fff;}
+
+  /* ---------- main ---------- */
+  #main{flex:1 1 auto;min-width:0;overflow-y:auto;padding:22px 26px 60px;}
+  .empty{color:var(--muted);font-style:italic;padding:8px 0;}
+  .fatal{color:var(--bad);white-space:pre-wrap;font-family:ui-monospace,monospace;font-size:13px;}
+
+  .level-head{display:flex;gap:20px;align-items:flex-start;margin-bottom:20px;flex-wrap:wrap;}
+  .icon-wrap{
+    flex:0 0 auto;width:128px;height:128px;border-radius:10px;overflow:hidden;
+    background:#0e1015;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;
+  }
+  .level-icon{width:100%;height:100%;object-fit:contain;display:block;image-rendering:auto;}
+  .level-info{flex:1 1 320px;min-width:0;}
+  .level-title{margin:0 0 6px;font-size:22px;font-weight:650;word-break:break-word;}
+  .level-desc{margin:0 0 10px;color:#c3cad9;white-space:pre-wrap;word-break:break-word;}
+  .group-line{font-size:13px;color:var(--muted);}
+  .group-link{font-weight:600;}
+
+  .section-title{margin:26px 0 10px;font-size:12px;letter-spacing:.9px;text-transform:uppercase;color:var(--accent2);}
+
+  .rows{border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--panel);}
+  .row{display:flex;gap:14px;padding:7px 12px;border-bottom:1px solid #262b38;align-items:flex-start;}
+  .row:last-child{border-bottom:none;}
+  .row:nth-child(odd){background:#1a1d26;}
+  .row-label{flex:0 0 210px;color:var(--muted);font-size:12px;letter-spacing:.3px;padding-top:1px;}
+  .row-value{flex:1 1 auto;min-width:0;word-break:break-word;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;}
+
+  .copy-btn{
+    margin-left:8px;background:var(--panel2);border:1px solid var(--border);color:var(--muted);
+    border-radius:5px;padding:0 6px;font-size:11px;line-height:17px;cursor:pointer;vertical-align:middle;
+  }
+  .copy-btn:hover{color:var(--text);border-color:var(--accent);}
+
+  .level-chip{
+    display:inline-block;background:#22304a;border:1px solid #3a5580;color:#bcd6ff;
+    border-radius:20px;padding:1px 10px;font-size:12px;font-family:inherit;cursor:pointer;
+  }
+  .level-chip:hover{background:#2c3f60;text-decoration:none;}
+  .level-chip.missing{background:#2a2020;border-color:#5a3232;color:#e0a0a0;cursor:default;}
+
+  .group-levels{border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--panel);}
+  .group-level-item{
+    display:flex;align-items:center;gap:12px;padding:9px 14px;cursor:pointer;
+    border-bottom:1px solid #262b38;
+  }
+  .group-level-item:last-child{border-bottom:none;}
+  .group-level-item:hover{background:#243044;}
+  .gl-name{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .gl-guid{color:var(--muted);font-family:ui-monospace,monospace;font-size:12px;}
+
+  ::-webkit-scrollbar{width:11px;height:11px;}
+  ::-webkit-scrollbar-track{background:transparent;}
+  ::-webkit-scrollbar-thumb{background:#333a4b;border-radius:6px;border:2px solid var(--panel);}
+  ::-webkit-scrollbar-thumb:hover{background:#414a60;}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>LBP <b>Bin</b> Browser (Levels) frontend entirely by DeepSeek</h1>
+  <span id="gameTitle"></span>
+  <div class="controls">
+    <label>Game <select id="gameSelect"></select></label>
+    <label>Language <select id="langSelect"></select></label>
+  </div>
+</header>
+
+<div id="app">
+  <aside id="sidebar">
+    <div class="side-top">
+      <div class="search-row">
+        <input type="text" id="searchInput" placeholder="Search levels…  (g1234 / 40-char hash)">
+      </div>
+      <div class="toggle-row">
+        <label><input type="checkbox" id="searchName" checked> Name</label>
+        <label><input type="checkbox" id="searchDesc"> Description</label>
+      </div>
+      <select id="groupFilter"></select>
+    </div>
+    <div id="results"></div>
+  </aside>
+  <main id="main"></main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
+<script>
+"use strict";
+
+/* ============================================================
+   Constants / state
+   ============================================================ */
+
+const ASSETS    = "lbpbb_assets/";
+const GAMES_DIR = "lbpbb_games/";
+const NO_GROUP  = "NO_LEVEL_GROUP";
+const SQL_CDN   = "https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/";
+
+let SQL = null;   // sql.js module (lazy)
+
+const state = {
+  games: [],
+  gameId: null,
+  gameName: "",
+  base: "",
+  textureGuids: {},
+  langStrings: {},
+  langsList: [],
+  binRows: [],
+  lgRows: [],
+  lgBySlot: new Map(),
+  levels: [],
+  levelByGuid: new Map(),
+  groups: new Map(),
+  groupOrder: [],
+  currentLevel: null,
+  currentGroup: null,
+};
+
+/* ============================================================
+   Tiny helpers
+   ============================================================ */
+
+const $ = sel => document.querySelector(sel);
+
+function h(tag, attrs, ...kids) {
+  const el = document.createElement(tag);
+  if (attrs) {
+    for (const [k, v] of Object.entries(attrs)) {
+      if (v === null || v === undefined || v === false) continue;
+      if (k === "class") el.className = v;
+      else if (k === "text") el.textContent = v;
+      else if (k.startsWith("on") && typeof v === "function") el.addEventListener(k.slice(2), v);
+      else el.setAttribute(k, v);
+    }
+  }
+  for (const kid of kids.flat(Infinity)) {
+    if (kid === null || kid === undefined || kid === false) continue;
+    el.appendChild(kid instanceof Node ? kid : document.createTextNode(String(kid)));
+  }
+  return el;
+}
+
+async function fetchJSON(url) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error("Failed to load " + url + " (" + r.status + " " + r.statusText + ")");
+  return r.json();
+}
+async function fetchText(url) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error("Failed to load " + url + " (" + r.status + " " + r.statusText + ")");
+  return r.text();
+}
+async function fetchBuf(url) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error("Failed to load " + url + " (" + r.status + " " + r.statusText + ")");
+  return r.arrayBuffer();
+}
+
+function execToObjects(db, sql) {
+  const res = db.exec(sql);
+  if (!res || !res.length) return [];
+  const { columns, values } = res[0];
+  return values.map(row => {
+    const o = {};
+    for (let i = 0; i < columns.length; i++) o[columns[i]] = row[i];
+    return o;
+  });
+}
+
+const isTrue = v => v === true || Number(v) === 1;
+const guidStr = v => (v === null || v === undefined) ? null : "g" + v;
+
+/* Formats a timestamp to:  Monday, 1st September 2022 3:21:04am
+   – Automatically converts to the user's local timezone (via `new Date`).
+   – Handles: Unix seconds, Unix milliseconds, and ISO-ish strings. */
+function formatTimestamp(value) {
+  if (value === null || value === undefined || value === "") return null;
+
+  let date = null;
+
+  // Numeric (Unix seconds or milliseconds)
+  if (typeof value === "number" || /^\d+$/.test(String(value))) {
+    const n = Number(value);
+    // Heuristic: < 1e12 → seconds, otherwise milliseconds
+    date = new Date(n < 1e12 ? n * 1000 : n);
+  } else {
+    // Strings: let Date parse it. If it contains a Z / +offset it will be
+    // converted to local time; if it's a bare "YYYY-MM-DDTHH:mm:ss" it is
+    // treated as local time (per ES spec) which is the usual case.
+    date = new Date(value);
+  }
+
+  if (!date || isNaN(date.getTime())) return String(value); // give up gracefully
+
+  const days   = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+  const months = ["January","February","March","April","May","June",
+                  "July","August","September","October","November","December"];
+
+  const ord = n => {
+    const s = ["th","st","nd","rd"];
+    const v = n % 100;
+    return n + (s[(v - 20) % 10] || s[v] || s[0]);
+  };
+
+  let hours = date.getHours();
+  const ampm = hours >= 12 ? "pm" : "am";
+  hours = hours % 12;
+  if (hours === 0) hours = 12;
+
+  const mm = String(date.getMinutes()).padStart(2, "0");
+  const ss = String(date.getSeconds()).padStart(2, "0");
+
+  return `${days[date.getDay()]}, ${ord(date.getDate())} ${months[date.getMonth()]} ` +
+         `${date.getFullYear()} ${hours}:${mm}:${ss}${ampm}`;
+}
+
+/* ============================================================
+   Language / key resolution
+   ============================================================ */
+
+function resolveKey(key) {
+  if (key === null || key === undefined) return null;
+  const s = state.langStrings[String(key)];
+  return (s === undefined || s === null) ? "MISSING_TRANS_KEY" : String(s);
+}
+
+/** For `..._key_or_actual_string` style columns. */
+function resolveMaybeKey(value, isIntFlag) {
+  if (value === null || value === undefined) return null;
+  if (isTrue(isIntFlag)) return resolveKey(value);
+  return String(value);
+}
+
+async function loadLanguage(file) {
+  try {
+    state.langStrings = await fetchJSON(state.base + "languages/" + file) || {};
+  } catch (e) {
+    console.warn("Could not load language file", file, e);
+    state.langStrings = {};
+  }
+}
+
+/* ============================================================
+   Icons
+   ============================================================ */
+
+function iconImg(guid) {
+  const img = document.createElement("img");
+  img.className = "level-icon";
+  img.alt = "";
+  if (guid === null || guid === undefined) {
+    img.src = ASSETS + "bin_has_no_icon.png";
+    img.title = "This bin has no icon GUID";
+    return img;
+  }
+  const entry = state.textureGuids[String(guid)];
+  if (!entry || !entry.length) {
+    img.src = ASSETS + "missing_icon_guid_in_texture_guids_json.png";
+    img.title = "g" + guid + " is not present in texture_guids.json";
+    return img;
+  }
+  img.src = String(entry[1]) + String(entry[0]) + ".png";
+  img.title = "g" + guid;
+  img.onerror = () => { img.onerror = null; img.src = ASSETS + "missing_texture.png"; };
+  return img;
+}
+
+/* ============================================================
+   Model building
+   ============================================================ */
+
+function makeLevel(bin) {
+  const hasTut = bin.tut_level_name_or_key !== null && bin.tut_level_name_or_key !== undefined;
+
+  let name = null, desc = null, iconGuid = null, metadataPath = null;
+  let groupId = null, groupName = null, groupIsTut = false;
+
+  if (hasTut) {
+    // CustomMetaDataFromDotTutFile wins over everything.
+    name = resolveMaybeKey(bin.tut_level_name_or_key, bin.tut_level_name_or_key_is_int);
+    desc = bin.tut_level_desc_or_key !== null && bin.tut_level_desc_or_key !== undefined
+      ? resolveMaybeKey(bin.tut_level_desc_or_key, bin.tut_level_desc_or_key_is_int)
+      : null;
+    iconGuid = (bin.tut_level_icon !== null && bin.tut_level_icon !== undefined) ? bin.tut_level_icon : null;
+    metadataPath = (bin.tut_file_name !== null && bin.tut_file_name !== undefined) ? bin.tut_file_name : null;
+    groupId = (bin.tut_origin_pretty !== null && bin.tut_origin_pretty !== undefined)
+      ? String(bin.tut_origin_pretty) : null;
+    groupName = groupId;
+    groupIsTut = true;
+  } else {
+    name = (bin.name_key !== null && bin.name_key !== undefined) ? resolveKey(bin.name_key) : null;
+    desc = (bin.desc_key !== null && bin.desc_key !== undefined) ? resolveKey(bin.desc_key) : null;
+    iconGuid = (bin.icon_guid !== null && bin.icon_guid !== undefined) ? bin.icon_guid : null;
+    metadataPath = (bin.metadata_file_path !== null && bin.metadata_file_path !== undefined) ? bin.metadata_file_path : null;
+
+    if (bin.group_id !== null && bin.group_id !== undefined && String(bin.group_id).trim() !== "") {
+      const gid = String(bin.group_id);
+      const gRow = state.lgBySlot.get(gid);
+      if (gRow) {
+        groupId = gid;
+        groupName = resolveKey(gRow.name_key);
+      }
+    }
+  }
+
+  // If neither tut name nor name_key exist, fall back to file_path.
+  if (name === null || name === "") {
+    name = (bin.file_path !== null && bin.file_path !== undefined && bin.file_path !== "")
+      ? String(bin.file_path)
+      : ("g" + bin.guid);
+  }
+
+  if (!groupId) { groupId = NO_GROUP; groupName = NO_GROUP; groupIsTut = false; }
+
+  // level_link_bin_guids = JSON list of ints
+  let links = [];
+  if (bin.level_link_bin_guids !== null && bin.level_link_bin_guids !== undefined && bin.level_link_bin_guids !== "") {
+    try {
+      const parsed = JSON.parse(bin.level_link_bin_guids);
+      if (Array.isArray(parsed)) links = parsed.map(x => String(x));
+    } catch (e) {
+      links = String(bin.level_link_bin_guids).split(",").map(s => s.trim()).filter(Boolean);
+    }
+  }
+
+  const nextGuid = (bin.what_level_this_unlocks_next_bin_guid !== null &&
+                    bin.what_level_this_unlocks_next_bin_guid !== undefined)
+    ? String(bin.what_level_this_unlocks_next_bin_guid) : null;
+
+  return {
+    raw: bin,
+    guid: bin.guid,
+    file_path: bin.file_path,
+    timestamp: bin.timestamp,
+    size: bin.size,
+    hash: bin.hash,
+    revision: bin.revision,
+    slot_id: bin.slot_id,
+    metadata_file_path: metadataPath,
+    name,
+    desc,
+    creator: resolveMaybeKey(bin.creator_key_or_actual_string, bin.creator_key_or_actual_string_is_int),
+    groupId,
+    groupName,
+    groupIsTut,
+    iconGuid,
+    links,
+    nextGuid,
+    hasTut,
+  };
+}
+
+function buildLevels() {
+  state.levels = state.binRows.map(makeLevel);
+  state.levelByGuid = new Map();
+  for (const l of state.levels) state.levelByGuid.set(String(l.guid), l);
+}
+
+function buildGroups() {
+  state.groups = new Map();
+
+  for (const l of state.levels) {
+    let g = state.groups.get(l.groupId);
+    if (!g) {
+      g = {
+        id: l.groupId, name: l.groupName, levels: [],
+        iconGuid: null, desc: null, creator: null, slotId: null, isTut: l.groupIsTut,
+      };
+      state.groups.set(l.groupId, g);
+    }
+    g.levels.push(l);
+  }
+
+  // Attach level_groups table details
+  for (const row of state.lgRows) {
+    if (row.slot_id === null || row.slot_id === undefined) continue;
+    const id = String(row.slot_id);
+    let g = state.groups.get(id);
+    if (!g) {
+      g = { id, name: resolveKey(row.name_key), levels: [], iconGuid: null, desc: null, creator: null, slotId: id, isTut: false };
+      state.groups.set(id, g);
+    }
+    g.slotId = id;
+    g.nameKey = row.name_key;
+    g.iconGuid = (row.icon_guid !== null && row.icon_guid !== undefined) ? row.icon_guid : null;
+    g.desc = (row.desc_key !== null && row.desc_key !== undefined) ? resolveKey(row.desc_key) : null;
+    g.creator = resolveMaybeKey(row.creator_key_or_actual_string, row.creator_key_or_actual_string_is_int);
+  }
+
+  state.groupOrder = [...state.groups.keys()].sort((a, b) => {
+    if (a === NO_GROUP) return 1;
+    if (b === NO_GROUP) return -1;
+    const na = state.groups.get(a).name || a;
+    const nb = state.groups.get(b).name || b;
+    return na.localeCompare(nb, undefined, { sensitivity: "base" });
+  });
+}
+
+/* ============================================================
+   Load pipeline
+   ============================================================ */
+
+async function boot() {
+  try {
+    const games = await fetchJSON("games_list.json");
+    if (!Array.isArray(games) || !games.length) throw new Error("games_list.json contains no games.");
+    state.games = games;
+
+    // Fetch each game_name.txt so the selector shows the pretty name.
+    const names = await Promise.all(games.map(async id => {
+      try { return (await fetchText(GAMES_DIR + id + "/game_name.txt")).trim() || id; }
+      catch (e) { return id; }
+    }));
+
+    const sel = $("#gameSelect");
+    sel.innerHTML = "";
+    games.forEach((id, i) => sel.appendChild(h("option", { value: id, text: names[i] })));
+    sel.addEventListener("change", () => { loadGame(sel.value).catch(showFatal); });
+
+    await loadGame(games[0]);
+  } catch (err) {
+    showFatal(err);
+  }
+}
+
+async function loadGame(gameId) {
+  state.gameId = gameId;
+  state.base = GAMES_DIR + gameId + "/";
+  state.currentLevel = null;
+  state.currentGroup = null;
+  $("#main").innerHTML = "";
+  $("#results").innerHTML = "";
+  $("#main").appendChild(h("div", { class: "empty", text: "Loading " + gameId + "…" }));
+
+  const base = state.base;
+
+  const [nameTxt, langsList, texGuids, dbBuf] = await Promise.all([
+    fetchText(base + "game_name.txt").catch(() => gameId),
+    fetchJSON(base + "languages_list.json").catch(() => []),
+    fetchJSON(base + "texture_guids.json").catch(() => ({})),
+    fetchBuf(base + "bin_details.db"),
+  ]);
+
+  state.gameName = (nameTxt || gameId).trim();
+  state.textureGuids = texGuids || {};
+  state.langsList = (Array.isArray(langsList) && langsList.length) ? langsList : ["english.json"];
+  $("#gameTitle").textContent = state.gameName;
+
+  // Language dropdown
+  const lsel = $("#langSelect");
+  lsel.innerHTML = "";
+  for (const f of state.langsList) {
+    lsel.appendChild(h("option", { value: f, text: f.replace(/\.json$/i, "") }));
+  }
+  lsel.onchange = async () => {
+    await loadLanguage(lsel.value);
+    rebuild();
+  };
+
+  // sql.js
+  if (!SQL) {
+    if (typeof initSqlJs !== "function") {
+      throw new Error("sql.js failed to load from the CDN.\nA network connection is required to read bin_details.db in the browser.");
+    }
+    SQL = await initSqlJs({ locateFile: f => SQL_CDN + f });
+  }
+
+  const db = new SQL.Database(new Uint8Array(dbBuf));
+  let bins = [];
+  let lgRows = [];
+  try {
+    bins = execToObjects(db, "SELECT * FROM bin_details");
+  } catch (e) {
+    db.close();
+    throw new Error("Could not read the bin_details table: " + e.message);
+  }
+  try {
+    lgRows = execToObjects(db, "SELECT * FROM level_groups");
+  } catch (e) {
+    lgRows = []; // table is optional
+  }
+  db.close();
+
+  state.binRows = bins;
+  state.lgRows = lgRows;
+  state.lgBySlot = new Map();
+  for (const r of lgRows) {
+    if (r.slot_id !== null && r.slot_id !== undefined) state.lgBySlot.set(String(r.slot_id), r);
+  }
+
+  await loadLanguage(state.langsList[0]);
+  lsel.value = state.langsList[0];
+
+  rebuild();
+}
+
+function rebuild() {
+  buildLevels();
+  buildGroups();
+  renderGroupFilter();
+  renderResults();
+
+  if (state.currentLevel && state.levelByGuid.has(String(state.currentLevel))) {
+    renderLevel(state.currentLevel);
+  } else if (state.currentGroup && state.groups.has(state.currentGroup)) {
+    renderGroup(state.currentGroup);
+  } else {
+    $("#main").innerHTML = "";
+    $("#main").appendChild(h("div", {
+      class: "empty",
+      text: state.levels.length
+        ? "Select a level from the list on the left."
+        : "No levels found in this game's bin_details table."
+    }));
+  }
+}
+
+/* ============================================================
+   Filtering / search
+   ============================================================ */
+
+function filterLevels() {
+  const q = $("#searchInput").value.trim();
+  const byName = $("#searchName").checked;
+  const byDesc = $("#searchDesc").checked;
+  const groupFilter = $("#groupFilter").value;
+
+  let list = state.levels;
+
+  if (groupFilter) list = list.filter(l => l.groupId === groupFilter);
+  if (!q) return list;
+
+  // Special case: gNUMBER
+  if (/^g\d+$/i.test(q)) {
+    const n = q.slice(1);
+    return list.filter(l => String(l.guid) === n);
+  }
+
+  // Special case: 40 character hex string (bin hash / texture hash)
+  if (/^[0-9a-fA-F]{40}$/.test(q)) {
+    const needle = q.toLowerCase();
+    return list.filter(l => {
+      if (l.hash && String(l.hash).toLowerCase() === needle) return true;
+      const entry = state.textureGuids[String(l.iconGuid)];
+      if (entry && entry[0] && String(entry[0]).toLowerCase() === needle) return true;
+      return false;
+    });
+  }
+
+  const needle = q.toLowerCase();
+  return list.filter(l => {
+    if (byName && l.name && l.name.toLowerCase().includes(needle)) return true;
+    if (byDesc && l.desc && l.desc.toLowerCase().includes(needle)) return true;
+    return false;
+  });
+}
+
+function renderGroupFilter() {
+  const sel = $("#groupFilter");
+  const prev = sel.value;
+  sel.innerHTML = "";
+  sel.appendChild(h("option", { value: "", text: "All level groups" }));
+  for (const gid of state.groupOrder) {
+    const g = state.groups.get(gid);
+    sel.appendChild(h("option", { value: gid, text: g.name || gid }));
+  }
+  sel.value = (prev === "" || state.groups.has(prev)) ? prev : "";
+}
+
+/* ============================================================
+   Sidebar
+   ============================================================ */
+
+function renderResults() {
+  const container = $("#results");
+  const scroll = container.scrollTop;
+  container.innerHTML = "";
+
+  const list = filterLevels();
+  if (!list.length) {
+    container.appendChild(h("div", { class: "empty", style: "padding:10px 14px;", text: "No matching levels." }));
+    return;
+  }
+
+  const byGroup = new Map();
+  for (const l of list) {
+    if (!byGroup.has(l.groupId)) byGroup.set(l.groupId, []);
+    byGroup.get(l.groupId).push(l);
+  }
+
+  for (const gid of state.groupOrder) {
+    const arr = byGroup.get(gid);
+    if (!arr || !arr.length) continue;
+    const g = state.groups.get(gid);
+    const name = g ? g.name : gid;
+
+    const block = h("div", { class: "group-block" });
+
+    block.appendChild(h("div", {
+      class: "group-header",
+      "data-group": gid,
+      title: gid,
+      onclick: () => renderGroup(gid),
+    },
+      h("span", { text: name }),
+      h("span", { class: "group-count", text: String(arr.length) })
+    ));
+
+    for (const l of arr) {
+      block.appendChild(h("div", {
+        class: "level-item",
+        "data-guid": String(l.guid),
+        title: l.name,
+        onclick: () => selectLevel(l.guid),
+      }, l.name));
+    }
+
+    container.appendChild(block);
+  }
+
+  container.scrollTop = scroll;
+  updateActive();
+}
+
+function updateActive() {
+  document.querySelectorAll(".level-item").forEach(el => {
+    el.classList.toggle("active", el.dataset.guid === String(state.currentLevel));
+  });
+  document.querySelectorAll(".group-header").forEach(el => {
+    el.classList.toggle("active", el.dataset.group === String(state.currentGroup));
+  });
+}
+
+/* ============================================================
+   Shared widgets
+   ============================================================ */
+
+function copyButton(text) {
+  const b = h("button", { class: "copy-btn", type: "button", title: "Copy", text: "⧉" });
+  b.addEventListener("click", ev => {
+    ev.stopPropagation();
+    ev.preventDefault();
+    const done = () => {
+      b.textContent = "✓";
+      setTimeout(() => { b.textContent = "⧉"; }, 800);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+    } else {
+      fallbackCopy(text, done);
+    }
+  });
+  return b;
+}
+
+function fallbackCopy(text, done) {
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.style.position = "fixed";
+  ta.style.opacity = "0";
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand("copy"); done(); } catch (e) { /* ignore */ }
+  document.body.removeChild(ta);
+}
+
+function levelChip(guid) {
+  const gid = String(guid);
+  const lv = state.levelByGuid.get(gid);
+  if (!lv) {
+    return h("span", {
+      class: "level-chip missing",
+      title: "g" + gid + " is not present in this bin database",
+      text: "g" + gid + " (missing)",
+    });
+  }
+  return h("a", {
+    class: "level-chip",
+    href: "javascript:void(0)",
+    title: "g" + gid,
+    text: lv.name,
+    onclick: ev => { ev.preventDefault(); selectLevel(gid); },
+  });
+}
+
+function levelChipList(guids) {
+  const span = h("span", { class: "chip-list" });
+  guids.forEach((id, i) => {
+    if (i) span.appendChild(document.createTextNode(" | "));
+    span.appendChild(levelChip(id));
+  });
+  return span;
+}
+
+function groupLink(groupId, groupName) {
+  const gid = groupId || NO_GROUP;
+  const label = groupName || gid;
+  if (state.groups.has(gid)) {
+    return h("a", {
+      class: "group-link",
+      href: "javascript:void(0)",
+      text: label,
+      onclick: ev => { ev.preventDefault(); renderGroup(gid); },
+    });
+  }
+  return h("span", { text: label });
+}
+
+function renderRows(rows) {
+  const wrap = h("div", { class: "rows" });
+  for (const r of rows) {
+    if (!r) continue;
+    const val = r.value;
+    if (val === null || val === undefined || val === "") continue;
+
+    const rowEl = h("div", { class: "row" });
+    rowEl.appendChild(h("div", { class: "row-label", text: r.label }));
+
+    const vEl = h("div", { class: "row-value" });
+    if (Array.isArray(val)) val.forEach(x => vEl.appendChild(x));
+    else if (val instanceof Node) vEl.appendChild(val);
+    else vEl.appendChild(document.createTextNode(String(val)));
+
+    if (r.copy !== null && r.copy !== undefined && r.copy !== "") {
+      vEl.appendChild(copyButton(String(r.copy)));
+    }
+
+    rowEl.appendChild(vEl);
+    wrap.appendChild(rowEl);
+  }
+  return wrap;
+}
+
+/* ============================================================
+   Level view
+   ============================================================ */
+
+function selectLevel(guid) {
+  state.currentLevel = String(guid);
+  state.currentGroup = null;
+  renderLevel(guid);
+  updateActive();
+}
+
+function levelRows(lv) {
+  const b = lv.raw;
+  const rows = [];
+  const add = (label, value, copy) => rows.push({ label, value, copy: copy });
+  const g = v => (v === null || v === undefined) ? null : "g" + v;
+  const bool = v => (v === null || v === undefined) ? null : (Number(v) ? "true" : "false");
+
+  // --- identity ---
+  add("GUID", guidStr(lv.guid), guidStr(lv.guid));
+  add("File Path", lv.file_path, lv.file_path);
+  add("Timestamp", formatTimestamp(lv.timestamp));
+  add("Size", lv.size);
+  add("Hash", lv.hash);
+  add("Revision", b.revision);
+  add("Slot ID", lv.slot_id);
+  add("Metadata File Path", lv.metadata_file_path, lv.metadata_file_path);
+
+  // --- metadata ---
+  add("Name", lv.name);
+  add("Description", lv.desc);
+  add("Creator", lv.creator);
+  add("Level Group", groupLink(lv.groupId, lv.groupName));
+  add("Icon GUID", g(lv.iconGuid), );
+
+  // --- level details ---
+  add("Level Type", b.level_type);
+  add("Game Mode", b.game_mode);
+  add("Badge Size", b.badge_size);
+  add("Min Players", b.min_players);
+  add("Max Players", b.max_players);
+  add("Enforce Player Limit", bool(b.enforce_player_limit));
+  add("Planet Decoration GUID", g(b.planet_decoration_guid));
+  add("Background GUID", g(b.background_guid));
+  add("Location X", b.location_x);
+  add("Location Y", b.location_y);
+  add("Location Z", b.location_z);
+  add("Location W", b.location_w);
+
+  // --- booleans ---
+  add("Initially Locked", bool(b.initially_locked));
+  add("Sub Level", bool(b.sub_level));
+  add("Move", bool(b.move));
+  add("Shareable", bool(b.shareable));
+  add("Is Game Kit", bool(b.is_game_kit));
+  add("Show Slot On Planet", bool(b.show_slot_on_planet));
+  add("Cross Controller", bool(b.cross_controller));
+
+  // --- links ---
+  add("What Next?", lv.nextGuid ? levelChip(lv.nextGuid) : null);
+  add("Level Link Links", lv.links.length ? levelChipList(lv.links) : null);
+
+  // --- tutorial / dot-tut metadata ---
+  if (lv.hasTut) {
+    add("Tut Origin Pretty", b.tut_origin_pretty);
+    add("Tut File Name", b.tut_file_name, b.tut_file_name);
+    add("Tut Level Icon GUID", g(b.tut_level_icon));
+  }
+
+  return rows;
+}
+
+function renderLevel(guid) {
+  const main = $("#main");
+  main.innerHTML = "";
+  const lv = state.levelByGuid.get(String(guid));
+
+  if (!lv) {
+    main.appendChild(h("div", { class: "empty", text: "Level not found: g" + guid }));
+    return;
+  }
+
+  const head = h("div", { class: "level-head" },
+    h("div", { class: "icon-wrap" }, iconImg(lv.iconGuid)),
+    h("div", { class: "level-info" },
+      h("h2", { class: "level-title", text: lv.name }),
+      lv.desc ? h("p", { class: "level-desc", text: lv.desc }) : null,
+      h("div", { class: "group-line" }, "Level Group: ", groupLink(lv.groupId, lv.groupName))
+    )
+  );
+
+  main.appendChild(head);
+  main.appendChild(renderRows(levelRows(lv)));
+  main.scrollTop = 0;
+}
+
+/* ============================================================
+   Group view
+   ============================================================ */
+
+function renderGroup(groupId) {
+  const main = $("#main");
+  main.innerHTML = "";
+
+  const g = state.groups.get(groupId);
+  state.currentGroup = groupId;
+  state.currentLevel = null;
+
+  if (!g) {
+    main.appendChild(h("div", { class: "empty", text: "Level group not found." }));
+    return;
+  }
+
+  const head = h("div", { class: "level-head" },
+    h("div", { class: "icon-wrap" }, iconImg(g.iconGuid)),
+    h("div", { class: "level-info" },
+      h("h2", { class: "level-title", text: g.name || g.id }),
+      h("p", { class: "level-desc", text: g.levels.length + " level" + (g.levels.length === 1 ? "" : "s") })
+    )
+  );
+  main.appendChild(head);
+
+  const rows = [];
+  const add = (label, value, copy) => rows.push({ label, value, copy });
+  add("Name", g.name);
+  add("Description", g.desc);
+  add("Creator", g.creator);
+  add("Slot ID", g.slotId);
+  add("Icon GUID", guidStr(g.iconGuid));
+  main.appendChild(renderRows(rows));
+
+  main.appendChild(h("h3", { class: "section-title", text: "Levels" }));
+
+  if (!g.levels.length) {
+    main.appendChild(h("div", { class: "empty", text: "No levels in this group." }));
+  } else {
+    const list = h("div", { class: "group-levels" });
+    for (const l of g.levels) {
+      list.appendChild(h("div", {
+        class: "group-level-item",
+        onclick: () => selectLevel(l.guid),
+      },
+        h("span", { class: "gl-name", text: l.name }),
+        h("span", { class: "gl-guid", text: "g" + l.guid })
+      ));
+    }
+    main.appendChild(list);
+  }
+
+  main.scrollTop = 0;
+  updateActive();
+}
+
+/* ============================================================
+   Errors
+   ============================================================ */
+
+function showFatal(err) {
+  console.error(err);
+  const main = $("#main");
+  main.innerHTML = "";
+  main.appendChild(h("div", { class: "fatal", text: "Error:\n" + (err && err.message ? err.message : String(err)) }));
+}
+
+/* ============================================================
+   Wiring
+   ============================================================ */
+
+$("#searchInput").addEventListener("input", renderResults);
+$("#searchName").addEventListener("change", renderResults);
+$("#searchDesc").addEventListener("change", renderResults);
+$("#groupFilter").addEventListener("change", renderResults);
+
+boot();
+</script>
+</body>
+</html>
