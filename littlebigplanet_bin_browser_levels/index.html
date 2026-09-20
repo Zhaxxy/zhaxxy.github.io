@@ -2,20 +2,24 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>LBP Bin Browser (Levels) frontend entirely by DeepSeek</title>
 <style>
   :root{
     --bg:#14161c; --panel:#1c1f28; --panel2:#232733; --border:#323848;
     --text:#e6e9f0; --muted:#9aa3b8; --accent:#6ea8fe; --accent2:#f5c451;
     --ok:#5fd38d; --bad:#ff7a7a;
+    --header-h:56px;
   }
   *{box-sizing:border-box;}
   html,body{height:100%;}
   body{
-    margin:0;display:flex;flex-direction:column;height:100vh;overflow:hidden;
+    margin:0;display:flex;flex-direction:column;
+    height:100vh;height:100dvh;overflow:hidden;
     background:var(--bg);color:var(--text);
     font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    -webkit-text-size-adjust:100%;
+    -webkit-tap-highlight-color:transparent;
   }
   a{color:var(--accent);text-decoration:none;}
   a:hover{text-decoration:underline;}
@@ -23,12 +27,31 @@
   header{
     flex:0 0 auto;display:flex;align-items:center;gap:18px;flex-wrap:wrap;
     padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--border);
+    padding-left:calc(16px + env(safe-area-inset-left));
+    padding-right:calc(16px + env(safe-area-inset-right));
   }
   header h1{font-size:15px;margin:0;font-weight:600;letter-spacing:.4px;white-space:nowrap;}
   header h1 b{color:var(--accent);font-weight:600;}
   #gameTitle{color:var(--muted);font-size:12px;letter-spacing:.4px;text-transform:uppercase;}
   .controls{display:flex;gap:16px;margin-left:auto;flex-wrap:wrap;}
   .controls label{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.6px;}
+
+  /* hamburger – hidden on desktop */
+  #menuBtn{
+    display:none;align-items:center;justify-content:center;
+    width:38px;height:38px;flex:0 0 auto;padding:0;
+    background:var(--panel2);color:var(--text);
+    border:1px solid var(--border);border-radius:8px;cursor:pointer;
+    touch-action:manipulation;
+  }
+  #menuBtn:hover{border-color:var(--accent);}
+  #menuBtn svg{width:18px;height:18px;display:block;}
+
+  #backdrop{
+    display:none;position:fixed;left:0;right:0;bottom:0;top:var(--header-h);
+    z-index:40;background:rgba(0,0,0,.55);
+    opacity:0;pointer-events:none;transition:opacity .2s ease;
+  }
 
   select,input[type=text]{
     background:var(--panel2);color:var(--text);border:1px solid var(--border);
@@ -51,7 +74,7 @@
   .toggle-row label{display:flex;align-items:center;gap:5px;cursor:pointer;user-select:none;}
   .toggle-row input{accent-color:var(--accent);}
 
-  #results{flex:1 1 auto;overflow-y:auto;padding:6px 0 24px;}
+  #results{flex:1 1 auto;overflow-y:auto;overscroll-behavior:contain;padding:6px 0 24px;}
   .group-block{margin-bottom:2px;}
   .group-header{
     display:flex;align-items:center;gap:8px;cursor:pointer;
@@ -72,7 +95,7 @@
   .level-item.active{background:#243044;border-left-color:var(--accent);color:#fff;}
 
   /* ---------- main ---------- */
-  #main{flex:1 1 auto;min-width:0;overflow-y:auto;padding:22px 26px 60px;}
+  #main{flex:1 1 auto;min-width:0;overflow-y:auto;overscroll-behavior:contain;padding:22px 26px 60px;}
   .empty{color:var(--muted);font-style:italic;padding:8px 0;}
   .fatal{color:var(--bad);white-space:pre-wrap;font-family:ui-monospace,monospace;font-size:13px;}
 
@@ -100,6 +123,7 @@
   .copy-btn{
     margin-left:8px;background:var(--panel2);border:1px solid var(--border);color:var(--muted);
     border-radius:5px;padding:0 6px;font-size:11px;line-height:17px;cursor:pointer;vertical-align:middle;
+    touch-action:manipulation;
   }
   .copy-btn:hover{color:var(--text);border-color:var(--accent);}
 
@@ -124,18 +148,105 @@
   ::-webkit-scrollbar-track{background:transparent;}
   ::-webkit-scrollbar-thumb{background:#333a4b;border-radius:6px;border:2px solid var(--panel);}
   ::-webkit-scrollbar-thumb:hover{background:#414a60;}
+
+  /* ============================================================
+     Mobile / narrow screens
+     ============================================================ */
+  @media (max-width: 860px){
+    header{
+      gap:10px;
+      padding:8px 10px;
+      padding-left:calc(10px + env(safe-area-inset-left));
+      padding-right:calc(10px + env(safe-area-inset-right));
+      position:relative;z-index:50;
+    }
+    #menuBtn{display:inline-flex;order:-1;}
+    header h1{font-size:13px;letter-spacing:.2px;white-space:normal;line-height:1.25;}
+    header h1 .credit{display:none;}
+    #gameTitle{display:none;}
+
+    .controls{margin-left:0;width:100%;gap:10px;}
+    .controls label{flex:1 1 0;min-width:0;font-size:10px;gap:5px;}
+    .controls select{
+      flex:1 1 auto;min-width:0;max-width:none;width:100%;
+      font-size:16px;padding:7px 8px;   /* 16px stops iOS zoom-on-focus */
+    }
+
+    /* sidebar becomes a slide-in drawer below the header */
+    #sidebar{
+      position:fixed;top:var(--header-h);left:0;bottom:0;
+      width:min(86vw,340px);flex:none;
+      z-index:45;
+      transform:translateX(-105%);
+      transition:transform .22s ease;
+      box-shadow:6px 0 30px rgba(0,0,0,.5);
+      padding-bottom:env(safe-area-inset-bottom);
+      padding-left:env(safe-area-inset-left);
+    }
+    body.nav-open #sidebar{transform:translateX(0);}
+    #backdrop{display:block;}
+    body.nav-open #backdrop{opacity:1;pointer-events:auto;}
+
+    /* bigger tap targets in the list */
+    .side-top{padding:8px;gap:7px;}
+    .search-row input[type=text]{font-size:16px;padding:8px 10px;}
+    .toggle-row{font-size:13px;gap:18px;}
+    #groupFilter{font-size:16px;padding:8px 10px;max-width:none;}
+    .group-header{padding:10px 12px;}
+    .level-item{padding:11px 12px 11px 20px;font-size:14px;}
+
+    /* main content */
+    #main{
+      padding:14px 12px calc(56px + env(safe-area-inset-bottom));
+      padding-left:calc(12px + env(safe-area-inset-left));
+      padding-right:calc(12px + env(safe-area-inset-right));
+    }
+    .level-head{gap:14px;margin-bottom:16px;}
+    .icon-wrap{width:88px;height:88px;border-radius:8px;}
+    .level-info{flex:1 1 100%;}
+    .level-title{font-size:18px;}
+    .level-desc{font-size:13.5px;}
+    .group-line{font-size:12px;}
+    .section-title{margin:20px 0 8px;}
+
+    /* stack label above value */
+    .row{flex-direction:column;gap:2px;padding:9px 12px;}
+    .row-label{flex:none;font-size:11px;text-transform:uppercase;letter-spacing:.5px;}
+    .row-value{font-size:13px;width:100%;}
+
+    .copy-btn{line-height:24px;padding:0 10px;margin-left:6px;}
+
+    .group-level-item{flex-wrap:wrap;gap:2px 10px;padding:11px 12px;}
+    .gl-name{flex:1 1 100%;white-space:normal;}
+    .gl-guid{font-size:11px;}
+
+    ::-webkit-scrollbar{width:8px;height:8px;}
+    ::-webkit-scrollbar-thumb{border-width:1px;}
+  }
+
+  @media (max-width: 380px){
+    header h1{font-size:12px;}
+    .controls label{font-size:9px;}
+  }
 </style>
 </head>
 <body>
 
 <header>
-  <h1>LBP <b>Bin</b> Browser (Levels) frontend entirely by DeepSeek</h1>
+  <button id="menuBtn" type="button" aria-label="Toggle level list"
+          aria-controls="sidebar" aria-expanded="false">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+         stroke-linecap="round" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+  </button>
+  <h1>LBP <b>Bin</b> Browser (Levels)<span class="credit"> frontend entirely by DeepSeek</span></h1>
   <span id="gameTitle"></span>
   <div class="controls">
     <label>Game <select id="gameSelect"></select></label>
     <label>Language <select id="langSelect"></select></label>
   </div>
 </header>
+
+<div id="backdrop"></div>
 
 <div id="app">
   <aside id="sidebar">
@@ -517,6 +628,7 @@ async function loadGame(gameId) {
   state.textureGuids = texGuids || {};
   state.langsList = (Array.isArray(langsList) && langsList.length) ? langsList : ["english.json"];
   $("#gameTitle").textContent = state.gameName;
+  syncHeaderHeight();
 
   // Language dropdown
   const lsel = $("#langSelect");
@@ -812,6 +924,7 @@ function selectLevel(guid) {
   state.currentGroup = null;
   renderLevel(guid);
   updateActive();
+  closeNav();
 }
 
 function levelRows(lv) {
@@ -913,6 +1026,7 @@ function renderGroup(groupId) {
 
   if (!g) {
     main.appendChild(h("div", { class: "empty", text: "Level group not found." }));
+    closeNav();
     return;
   }
 
@@ -954,6 +1068,7 @@ function renderGroup(groupId) {
 
   main.scrollTop = 0;
   updateActive();
+  closeNav();
 }
 
 /* ============================================================
@@ -966,6 +1081,45 @@ function showFatal(err) {
   main.innerHTML = "";
   main.appendChild(h("div", { class: "fatal", text: "Error:\n" + (err && err.message ? err.message : String(err)) }));
 }
+
+/* ============================================================
+   Mobile drawer / header height
+   ============================================================ */
+
+const headerEl = document.querySelector("header");
+const menuBtn  = $("#menuBtn");
+const backdrop = $("#backdrop");
+
+function syncHeaderHeight() {
+  document.documentElement.style.setProperty("--header-h", headerEl.offsetHeight + "px");
+}
+
+function openNav() {
+  document.body.classList.add("nav-open");
+  menuBtn.setAttribute("aria-expanded", "true");
+}
+function closeNav() {
+  if (!document.body.classList.contains("nav-open")) return;
+  document.body.classList.remove("nav-open");
+  menuBtn.setAttribute("aria-expanded", "false");
+}
+function isNarrow() {
+  return window.matchMedia("(max-width: 860px)").matches;
+}
+
+menuBtn.addEventListener("click", () => {
+  document.body.classList.contains("nav-open") ? closeNav() : openNav();
+});
+backdrop.addEventListener("click", closeNav);
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeNav(); });
+window.addEventListener("resize", () => {
+  syncHeaderHeight();
+  if (!isNarrow()) closeNav();
+});
+window.addEventListener("orientationchange", () => setTimeout(syncHeaderHeight, 150));
+
+if (window.ResizeObserver) new ResizeObserver(syncHeaderHeight).observe(headerEl);
+syncHeaderHeight();
 
 /* ============================================================
    Wiring
