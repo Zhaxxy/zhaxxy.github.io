@@ -160,6 +160,17 @@
 		background: var(--panel);
 	}
 
+	.header-row {
+		display: flex;
+		align-items: flex-start;
+		justify-content: space-between;
+		gap: 16px;
+	}
+
+	.header-info {
+		min-width: 0;
+	}
+
     header h1 {
         margin: 0 0 5px;
         font-size: 22px;
@@ -169,6 +180,67 @@
         color: var(--muted);
         font-size: 13px;
     }
+
+	/* ============================
+	   Cart button in header
+	   ============================ */
+
+	.cart-button {
+		position: relative;
+		flex: 0 0 auto;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+
+		width: 46px;
+		height: 46px;
+		padding: 0;
+
+		background: var(--input);
+		border: 1px solid var(--border);
+		border-radius: 8px;
+
+		color: var(--text);
+		cursor: pointer;
+	}
+
+	.cart-button:hover {
+		background: var(--panel-2);
+		border-color: #505766;
+	}
+
+	.cart-button svg {
+		width: 22px;
+		height: 22px;
+	}
+
+	.cart-count {
+		position: absolute;
+		top: -7px;
+		right: -7px;
+
+		min-width: 20px;
+		height: 20px;
+		padding: 0 5px;
+
+		display: flex;
+		align-items: center;
+		justify-content: center;
+
+		border-radius: 10px;
+		background: var(--accent);
+		color: #0b1220;
+
+		font-size: 11px;
+		font-weight: 700;
+		line-height: 1;
+
+		pointer-events: none;
+	}
+
+	.cart-count.hidden {
+		display: none;
+	}
 
 	.toolbar {
 		flex: 0 0 auto;
@@ -282,25 +354,76 @@
         padding: 3px 0;
     }
 
-    .plan-item {
-        display: block;
-        width: 100%;
-        padding: 8px 16px 8px 29px;
-        border: 0;
-        border-radius: 0;
-        background: transparent;
-        color: var(--text);
-        text-align: left;
-        transition: background 0.1s;
-    }
+	/* ============================
+	   Plan list rows
+	   ============================ */
 
-    .plan-item:hover {
-        background: #222733;
-    }
+	.plan-item-row {
+		position: relative;
+	}
 
-    .plan-item.selected {
-        background: var(--selected);
-    }
+	.plan-item-row .plan-item {
+		display: block;
+		width: 100%;
+		padding: 8px 16px 8px 29px;
+		border: 0;
+		border-radius: 0;
+		background: transparent;
+		color: var(--text);
+		text-align: left;
+		transition: background 0.1s;
+	}
+
+	.plan-item-row.has-cart .plan-item {
+		padding-right: 48px;
+	}
+
+	.plan-item-row .plan-item:hover {
+		background: #222733;
+	}
+
+	.plan-item-row .plan-item.selected {
+		background: var(--selected);
+	}
+
+	.cart-add-button {
+		position: absolute;
+		right: 10px;
+		top: 50%;
+		transform: translateY(-50%);
+
+		width: 28px;
+		height: 28px;
+		padding: 0;
+
+		display: flex;
+		align-items: center;
+		justify-content: center;
+
+		border-radius: 6px;
+		background: var(--panel-2);
+		border: 1px solid var(--border);
+		color: var(--text);
+
+		font-size: 16px;
+		line-height: 1;
+
+		cursor: pointer;
+		opacity: 0.75;
+	}
+
+	.cart-add-button:hover {
+		opacity: 1;
+		background: var(--selected);
+	}
+
+	.cart-add-button.in-cart {
+		opacity: 1;
+		background: var(--accent);
+		border-color: var(--accent);
+		color: #0b1220;
+		font-weight: 700;
+	}
 
 
 	.character-icon {
@@ -388,6 +511,13 @@
         color: var(--muted);
         font-size: 14px;
     }
+
+	.heading-actions {
+		margin-top: 14px;
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px;
+	}
 
     .description {
         margin: 0 0 28px;
@@ -600,6 +730,267 @@
 .copy-button.copied {
     border-color: #4caf50;
 }
+
+/* ============================
+   Modal / cart / checkout
+   ============================ */
+
+.modal-backdrop {
+	position: fixed;
+	inset: 0;
+	z-index: 200;
+
+	display: flex;
+	align-items: center;
+	justify-content: center;
+
+	padding: 20px;
+	background: rgba(10, 11, 14, 0.82);
+}
+
+.modal {
+	width: min(580px, 100%);
+	max-height: calc(100vh - 40px);
+
+	display: flex;
+	flex-direction: column;
+
+	background: var(--panel);
+	border: 1px solid var(--border);
+	border-radius: 10px;
+
+	box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+	overflow: hidden;
+}
+
+.modal-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+
+	padding: 16px 20px;
+	border-bottom: 1px solid var(--border);
+	background: var(--panel-2);
+}
+
+.modal-title {
+	margin: 0;
+	font-size: 18px;
+}
+
+.modal-close {
+	width: 32px;
+	height: 32px;
+	padding: 0;
+
+	display: flex;
+	align-items: center;
+	justify-content: center;
+
+	background: transparent;
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	color: var(--muted);
+
+	font-size: 20px;
+	line-height: 1;
+	cursor: pointer;
+}
+
+.modal-close:hover {
+	color: var(--text);
+	background: var(--panel);
+}
+
+.modal-body {
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow-y: auto;
+	padding: 16px 20px;
+}
+
+.modal-footer {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: flex-end;
+	gap: 10px;
+
+	padding: 14px 20px;
+	border-top: 1px solid var(--border);
+	background: var(--panel-2);
+}
+
+.cart-list {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.cart-list-scroll {
+	max-height: 42vh;
+	overflow-y: auto;
+	padding-right: 4px;
+}
+
+.cart-entry {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+
+	padding: 9px 11px;
+
+	background: var(--panel-2);
+	border: 1px solid var(--border);
+	border-radius: 8px;
+}
+
+.cart-entry-icon {
+	flex: 0 0 auto;
+
+	width: 42px;
+	height: 42px;
+
+	object-fit: contain;
+
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	background: #0d0f13;
+}
+
+.cart-entry-name {
+	flex: 1;
+	min-width: 0;
+
+	font-size: 14px;
+	overflow-wrap: anywhere;
+}
+
+.cart-entry-remove {
+	flex: 0 0 auto;
+
+	width: 28px;
+	height: 28px;
+	padding: 0;
+
+	display: flex;
+	align-items: center;
+	justify-content: center;
+
+	background: transparent;
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	color: var(--muted);
+
+	font-size: 16px;
+	line-height: 1;
+	cursor: pointer;
+}
+
+.cart-entry-remove:hover {
+	color: var(--danger);
+	border-color: var(--danger);
+}
+
+.cart-empty {
+	padding: 32px 20px;
+	text-align: center;
+	color: var(--muted);
+}
+
+.guid-box {
+	display: flex;
+	align-items: stretch;
+	gap: 8px;
+	margin-top: 16px;
+}
+
+.guid-box textarea {
+	flex: 1;
+	min-width: 0;
+	min-height: 88px;
+	padding: 10px 12px;
+
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	background: var(--input);
+	color: var(--text);
+
+	font-family: monospace;
+	font-size: 12px;
+
+	resize: vertical;
+	overflow-wrap: anywhere;
+	white-space: pre-wrap;
+	word-break: break-all;
+}
+
+.guid-box .copy-button {
+	align-self: stretch;
+	padding: 0 14px;
+}
+
+.cart-instructions {
+	margin-top: 16px;
+	padding: 14px 16px;
+
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	background: var(--panel-2);
+
+	color: var(--muted);
+	font-size: 13px;
+	line-height: 1.65;
+
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}
+
+.cart-instructions a {
+	color: var(--accent);
+	overflow-wrap: anywhere;
+}
+
+.cart-instructions code {
+	padding: 1px 5px;
+
+	background: var(--input);
+	border: 1px solid var(--border);
+	border-radius: 4px;
+
+	color: var(--text);
+	font-size: 12px;
+	font-family: monospace;
+}
+
+.primary-button {
+	padding: 9px 16px;
+	font-weight: 600;
+
+	background: var(--accent);
+	border-color: var(--accent);
+	color: #0b1220;
+}
+
+.primary-button:hover {
+	background: var(--accent-hover);
+	border-color: var(--accent-hover);
+}
+
+.secondary-button {
+	padding: 9px 16px;
+}
+
+@media (max-width: 800px) {
+	.modal-footer {
+		flex-direction: column-reverse;
+		align-items: stretch;
+	}
+
+	.modal-footer button {
+		width: 100%;
+	}
+}
 </style>
 
 
@@ -610,8 +1001,36 @@
 
 
 <header>
-    <h1>LittleBigPlanet Plan Browser (frontend entirely by chatgpt)</h1>
-    <div class="status" id="status">Loading...</div>
+	<div class="header-row">
+		<div class="header-info">
+			<h1>LittleBigPlanet Plan Browser (frontend entirely by chatgpt)</h1>
+			<div class="status" id="status">Loading...</div>
+		</div>
+
+		<button
+			id="cartButton"
+			class="cart-button"
+			type="button"
+			title="Cart"
+			style="display:none;"
+		>
+			<svg
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<circle cx="9" cy="21" r="1"></circle>
+				<circle cx="20" cy="21" r="1"></circle>
+				<path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+			</svg>
+
+			<span class="cart-count hidden" id="cartCount">0</span>
+		</button>
+	</div>
 </header>
 
 <div class="toolbar">
@@ -740,6 +1159,29 @@
     </div>
 </div>
 
+<!-- ============================
+     Cart / checkout modal
+     ============================ -->
+
+<div class="modal-backdrop" id="cartModal" style="display:none;">
+	<div class="modal" role="dialog" aria-modal="true">
+		<div class="modal-header">
+			<h2 class="modal-title" id="cartModalTitle">Cart</h2>
+
+			<button
+				class="modal-close"
+				id="cartModalClose"
+				type="button"
+				title="Close"
+			>×</button>
+		</div>
+
+		<div class="modal-body" id="cartModalBody"></div>
+
+		<div class="modal-footer" id="cartModalFooter"></div>
+	</div>
+</div>
+
 <!--
     sql.js is the SQLite implementation used entirely in the browser.
 
@@ -788,6 +1230,21 @@ const SQL_WASM_PATH =
 
 
 /*
+ * Files that, if present in a game directory, enable the "cart"
+ * feature for that game.
+ */
+const CART_SUPPORT_FILES = [
+    "support_fake_guid_comma_cart.txt",
+    "support_fake_guid_comma_cart"
+];
+
+/*
+ * localStorage key used to persist carts across page reloads.
+ */
+const CART_STORAGE_KEY = "lbppb_cart_v1";
+
+
+/*
  * ============================================================
  * Application state
  * ============================================================
@@ -825,7 +1282,22 @@ const state = {
      */
     detailsRequestId: 0,
 	
-	groupFilterValue: ""
+	groupFilterValue: "",
+
+	/*
+	 * Whether the current game supports the cart feature.
+	 */
+	cartSupported: false,
+
+	/*
+	 * Map of gameId -> array of plan GUID strings.
+	 */
+	cart: {},
+
+	/*
+	 * Currently displayed modal view: "cart" | "checkout" | null
+	 */
+	cartView: null
 };
 
 
@@ -861,6 +1333,15 @@ const statusElement = $("status");
 const loadingElement = $("loading");
 const loadingTitle = $("loadingTitle");
 const loadingText = $("loadingText");
+
+const cartButton = $("cartButton");
+const cartCountElement = $("cartCount");
+
+const cartModal = $("cartModal");
+const cartModalTitle = $("cartModalTitle");
+const cartModalBody = $("cartModalBody");
+const cartModalFooter = $("cartModalFooter");
+const cartModalClose = $("cartModalClose");
 
 
 const CHARACTER_ICONS = {
@@ -1242,6 +1723,29 @@ async function fetchArrayBuffer(url) {
     return response.arrayBuffer();
 }
 
+/*
+ * Returns true if any of the CART_SUPPORT_FILES exist in the
+ * given game directory.
+ */
+async function checkCartSupport(gameId) {
+    for (const filename of CART_SUPPORT_FILES) {
+        try {
+            const response = await fetch(
+                gamePath(gameId, filename),
+                { cache: "no-store" }
+            );
+
+            if (response.ok) {
+                return true;
+            }
+        } catch (error) {
+            /* Ignore and try the next candidate. */
+        }
+    }
+
+    return false;
+}
+
 
 /*
  * ============================================================
@@ -1368,6 +1872,23 @@ async function loadGame(gameId) {
 
     languageSelect.value = state.language;
 
+    /*
+     * Detect cart support for this game.
+     */
+    setLoading(
+        "Checking cart support...",
+        gameId
+    );
+
+    state.cartSupported = await checkCartSupport(gameId);
+
+    /*
+     * Make sure there is an array for this game.
+     */
+    if (!Array.isArray(state.cart[gameId])) {
+        state.cart[gameId] = [];
+    }
+
     await loadGameDatabase();
     await loadTranslations();
     await loadTextureGuids();
@@ -1376,6 +1897,16 @@ async function loadGame(gameId) {
 
     updateGroupFilter();
     renderResults();
+
+    /*
+     * Refresh header cart button visibility and count.
+     */
+    updateCartUI();
+
+    /*
+     * Close any open cart modal when switching games.
+     */
+    closeCartModal();
 
     setStatus(
         `${state.gameName} — ${state.plans.length.toLocaleString()} plans`
@@ -1952,6 +2483,16 @@ function renderResults() {
         planList.className = "plan-list";
 
         for (const plan of categoryPlans) {
+            const row =
+                document.createElement("div");
+
+            row.className = "plan-item-row";
+            row.dataset.guid = String(plan.guid);
+
+            if (state.cartSupported) {
+                row.classList.add("has-cart");
+            }
+
             const button =
                 document.createElement("button");
 
@@ -2003,7 +2544,39 @@ button.innerHTML = `
                 () => selectPlan(plan)
             );
 
-            planList.appendChild(button);
+            row.appendChild(button);
+
+            if (state.cartSupported) {
+                const cartAdd =
+                    document.createElement("button");
+
+                cartAdd.type = "button";
+                cartAdd.className = "cart-add-button";
+
+                cartAdd.dataset.guid = String(plan.guid);
+
+                updateCartAddButton(
+                    cartAdd,
+                    plan.guid
+                );
+
+                cartAdd.addEventListener(
+                    "click",
+                    event => {
+                        event.stopPropagation();
+
+                        if (isInCart(plan.guid)) {
+                            removeFromCart(plan.guid);
+                        } else {
+                            addToCart(plan);
+                        }
+                    }
+                );
+
+                row.appendChild(cartAdd);
+            }
+
+            planList.appendChild(row);
         }
 
         categoryElement.appendChild(planList);
@@ -2087,6 +2660,499 @@ function getMissingGuidIcon() {
 
 /*
  * ============================================================
+ * Cart state helpers
+ * ============================================================
+ */
+
+function loadCartFromStorage() {
+    try {
+        const raw = localStorage.getItem(CART_STORAGE_KEY);
+
+        if (raw) {
+            const parsed = JSON.parse(raw);
+
+            if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+                state.cart = parsed;
+            }
+        }
+    } catch (error) {
+        console.warn("Could not load cart from storage:", error);
+        state.cart = {};
+    }
+}
+
+function saveCartToStorage() {
+    try {
+        localStorage.setItem(
+            CART_STORAGE_KEY,
+            JSON.stringify(state.cart)
+        );
+    } catch (error) {
+        console.warn("Could not save cart to storage:", error);
+    }
+}
+
+function getCartForGame(gameId = state.gameId) {
+    if (!gameId) {
+        return [];
+    }
+
+    if (!Array.isArray(state.cart[gameId])) {
+        state.cart[gameId] = [];
+    }
+
+    return state.cart[gameId];
+}
+
+function isInCart(guid) {
+    const target = String(guid);
+
+    return getCartForGame().some(
+        item => String(item) === target
+    );
+}
+
+function addToCart(plan) {
+    if (!state.cartSupported) {
+        return;
+    }
+
+    const cart = getCartForGame();
+    const target = String(plan.guid);
+
+    if (cart.some(item => String(item) === target)) {
+        return;
+    }
+
+    cart.push(target);
+
+    saveCartToStorage();
+    refreshCartButtons();
+}
+
+function removeFromCart(guid) {
+    const gameId = state.gameId;
+
+    if (!gameId) {
+        return;
+    }
+
+    const target = String(guid);
+
+    state.cart[gameId] = getCartForGame(gameId).filter(
+        item => String(item) !== target
+    );
+
+    saveCartToStorage();
+    refreshCartButtons();
+}
+
+function clearCart() {
+    if (!state.gameId) {
+        return;
+    }
+
+    state.cart[state.gameId] = [];
+
+    saveCartToStorage();
+    refreshCartButtons();
+}
+
+/*
+ * Returns the plan objects currently in the cart, in cart order.
+ */
+function getCartPlans() {
+    const guids = getCartForGame();
+
+    return guids
+        .map(guid =>
+            state.plans.find(
+                plan => String(plan.guid) === String(guid)
+            )
+        )
+        .filter(Boolean);
+}
+
+function updateCartAddButton(button, guid) {
+    if (isInCart(guid)) {
+        button.classList.add("in-cart");
+        button.textContent = "✓";
+        button.title = "Remove from cart";
+    } else {
+        button.classList.remove("in-cart");
+        button.textContent = "+";
+        button.title = "Add to cart";
+    }
+}
+
+function updateDetailsCartButton() {
+    const button = $("detailsCartButton");
+
+    if (!button) {
+        return;
+    }
+
+    const guid = button.dataset.guid;
+
+    if (isInCart(guid)) {
+        button.textContent = "Remove from cart";
+    } else {
+        button.textContent = "Add to cart";
+    }
+}
+
+/*
+ * Updates the header cart button, the count badge, every add
+ * button in the plan list, and the details add button.
+ */
+function refreshCartButtons() {
+    document
+        .querySelectorAll(".plan-item-row")
+        .forEach(row => {
+            const button = row.querySelector(
+                ".cart-add-button"
+            );
+
+            if (!button) {
+                return;
+            }
+
+            updateCartAddButton(button, row.dataset.guid);
+        });
+
+    updateDetailsCartButton();
+    updateCartUI();
+
+    /*
+     * If a cart/checkout modal is currently open, refresh it.
+     */
+    if (state.cartView === "cart") {
+        renderCartModal();
+    } else if (state.cartView === "checkout") {
+        renderCheckoutModal();
+    }
+}
+
+function updateCartUI() {
+    if (!cartButton || !cartCountElement) {
+        return;
+    }
+
+    if (!state.cartSupported) {
+        cartButton.style.display = "none";
+        return;
+    }
+
+    cartButton.style.display = "inline-flex";
+
+    const count = getCartForGame().length;
+
+    if (count === 0) {
+        cartCountElement.classList.add("hidden");
+    } else {
+        cartCountElement.classList.remove("hidden");
+        cartCountElement.textContent = String(count);
+    }
+}
+
+
+/*
+ * ============================================================
+ * Cart modal
+ * ============================================================
+ */
+
+function createCartEntryIcon(plan) {
+    const img = document.createElement("img");
+
+    img.className = "cart-entry-icon";
+    img.alt = "";
+
+    const remote = getRemoteIconUrl(plan);
+
+    if (remote) {
+        img.src = remote;
+
+        img.onerror = () => {
+            img.onerror = null;
+            img.src = getFallbackIcon();
+        };
+    } else {
+        img.src = getMissingGuidIcon();
+    }
+
+    return img;
+}
+
+function createCartEntry(plan, options = {}) {
+    const {
+        showRemove = true
+    } = options;
+
+    const entry = document.createElement("div");
+    entry.className = "cart-entry";
+
+    entry.appendChild(createCartEntryIcon(plan));
+
+    const name = document.createElement("div");
+    name.className = "cart-entry-name";
+    name.textContent = plan.title;
+    name.title = plan.title;
+
+    entry.appendChild(name);
+
+    if (showRemove) {
+        const remove = document.createElement("button");
+
+        remove.type = "button";
+        remove.className = "cart-entry-remove";
+        remove.textContent = "×";
+        remove.title = "Remove from cart";
+
+        remove.addEventListener("click", () => {
+            removeFromCart(plan.guid);
+        });
+
+        entry.appendChild(remove);
+    }
+
+    return entry;
+}
+
+function openCartModal() {
+    if (!state.cartSupported) {
+        return;
+    }
+
+    renderCartModal();
+
+    cartModal.style.display = "flex";
+}
+
+function closeCartModal() {
+    cartModal.style.display = "none";
+    state.cartView = null;
+}
+
+function renderCartModal() {
+    state.cartView = "cart";
+
+    cartModalTitle.textContent = "Cart";
+
+    cartModalBody.innerHTML = "";
+    cartModalFooter.innerHTML = "";
+
+    const plans = getCartPlans();
+
+    if (plans.length === 0) {
+        const empty = document.createElement("div");
+
+        empty.className = "cart-empty";
+        empty.textContent = "Your cart is empty.";
+
+        cartModalBody.appendChild(empty);
+
+        return;
+    }
+
+    const list = document.createElement("div");
+    list.className = "cart-list";
+
+    for (const plan of plans) {
+        list.appendChild(createCartEntry(plan));
+    }
+
+    cartModalBody.appendChild(list);
+
+    /*
+     * Footer: Clear cart + Continue to checkout
+     */
+    const clearButton = document.createElement("button");
+
+    clearButton.type = "button";
+    clearButton.className = "secondary-button";
+    clearButton.textContent = "Clear cart";
+
+    clearButton.addEventListener("click", () => {
+        clearCart();
+    });
+
+    const checkoutButton = document.createElement("button");
+
+    checkoutButton.type = "button";
+    checkoutButton.className = "primary-button";
+    checkoutButton.textContent = "Continue to checkout";
+
+    checkoutButton.addEventListener("click", () => {
+        renderCheckoutModal();
+    });
+
+    cartModalFooter.appendChild(clearButton);
+    cartModalFooter.appendChild(checkoutButton);
+}
+
+function renderCheckoutModal() {
+    state.cartView = "checkout";
+
+    cartModalTitle.textContent = "Checkout";
+
+    cartModalBody.innerHTML = "";
+    cartModalFooter.innerHTML = "";
+
+    const plans = getCartPlans();
+
+    if (plans.length === 0) {
+        const empty = document.createElement("div");
+
+        empty.className = "cart-empty";
+        empty.textContent = "Your cart is empty.";
+
+        cartModalBody.appendChild(empty);
+    } else {
+        /*
+         * Scrollable box containing the plan entries.
+         */
+        const list = document.createElement("div");
+        list.className = "cart-list cart-list-scroll";
+
+        for (const plan of plans) {
+            list.appendChild(
+                createCartEntry(plan, { showRemove: false })
+            );
+        }
+
+        cartModalBody.appendChild(list);
+
+        /*
+         * GUID string + copy button.
+         */
+		const guidString = plans
+			.map(plan => `g${plan.guid}`)
+			.join(",");
+
+        const guidBox = document.createElement("div");
+        guidBox.className = "guid-box";
+
+        const textarea = document.createElement("textarea");
+
+        textarea.readOnly = true;
+        textarea.spellcheck = false;
+        textarea.value = guidString;
+        textarea.setAttribute("aria-label", "Plan GUIDs");
+
+        textarea.addEventListener("focus", () => {
+            textarea.select();
+        });
+
+        const copyButton = document.createElement("button");
+
+        copyButton.type = "button";
+        copyButton.className = "copy-button";
+        copyButton.innerHTML = `
+            <svg
+                class="copy-icon"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+            >
+                <rect
+                    x="9"
+                    y="9"
+                    width="11"
+                    height="11"
+                    rx="2"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                />
+                <path
+                    d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                />
+            </svg>
+            <span class="copy-button-text">Copy</span>
+        `;
+
+        copyButton.addEventListener("click", async () => {
+            const textElement = copyButton.querySelector(
+                ".copy-button-text"
+            );
+
+            try {
+                await navigator.clipboard.writeText(guidString);
+
+                textElement.textContent = "Copied";
+                copyButton.classList.add("copied");
+            } catch (error) {
+                console.error("Could not copy GUIDs:", error);
+
+                /*
+                 * Fallback for browsers without clipboard API.
+                 */
+                textarea.focus();
+                textarea.select();
+
+                try {
+                    document.execCommand("copy");
+                    textElement.textContent = "Copied";
+                    copyButton.classList.add("copied");
+                } catch (fallbackError) {
+                    textElement.textContent = "Failed";
+                }
+            }
+
+            setTimeout(() => {
+                textElement.textContent = "Copy";
+                copyButton.classList.remove("copied");
+            }, 1500);
+        });
+
+        guidBox.appendChild(textarea);
+        guidBox.appendChild(copyButton);
+
+        cartModalBody.appendChild(guidBox);
+
+        /*
+         * Instructions.
+         */
+        const instructions = document.createElement("div");
+
+        instructions.className = "cart-instructions";
+
+        instructions.innerHTML = `
+To collect these join this discord server
+<a href="https://discord.gg/fakeinvitelmao" target="_blank" rel="noopener noreferrer">https://discord.gg/fakeinvitelmao</a>
+Then run the command <code>/planguids2prizes</code>
+either in
+<b>#ezlbp2ps4-bot-usage</b>
+or you can dm the eZlbp2ps4 bot and run the command there
+and paste the string in the <code>plan_guids</code> option
+        `.trim();
+
+        cartModalBody.appendChild(instructions);
+    }
+
+    /*
+     * Footer: Back button.
+     */
+    const backButton = document.createElement("button");
+
+    backButton.type = "button";
+    backButton.className = "secondary-button";
+    backButton.textContent = "Back";
+
+    backButton.addEventListener("click", () => {
+        renderCartModal();
+    });
+
+    cartModalFooter.appendChild(backButton);
+}
+
+
+/*
+ * ============================================================
  * Plan details
  * ============================================================
  */
@@ -2150,6 +3216,21 @@ async function renderDetails(plan, requestId) {
                     <div class="heading-category">
                         ${escapeHtml(plan.category)}
                     </div>
+
+                    ${
+                        state.cartSupported
+                            ? `
+                                <div class="heading-actions">
+                                    <button
+                                        id="detailsCartButton"
+                                        class="secondary-button"
+                                        type="button"
+                                        data-guid="${escapeHtml(String(plan.guid))}"
+                                    ></button>
+                                </div>
+                            `
+                            : ""
+                    }
                 </div>
 
             </div>
@@ -2190,48 +3271,67 @@ async function renderDetails(plan, requestId) {
 
         </div>
     `;
-detailsElement
-    .querySelectorAll(".copy-button")
-    .forEach(button => {
-        button.addEventListener(
-            "click",
-            async () => {
-                const value =
-                    button.dataset.copyValue ?? "";
 
-                const textElement =
-                    button.querySelector(
-                        ".copy-button-text"
-                    );
+    /*
+     * Wire up the details "Add to cart" / "Remove from cart" button.
+     */
+    const detailsCartButton = $("detailsCartButton");
 
-                try {
-                    await navigator.clipboard.writeText(
-                        value
-                    );
-
-                    textElement.textContent = "Copied";
-                    button.classList.add("copied");
-
-                    setTimeout(() => {
-                        textElement.textContent = "Copy";
-                        button.classList.remove("copied");
-                    }, 1500);
-
-                } catch (error) {
-                    console.error(
-                        "Could not copy value:",
-                        error
-                    );
-
-                    textElement.textContent = "Failed";
-
-                    setTimeout(() => {
-                        textElement.textContent = "Copy";
-                    }, 1500);
-                }
+    if (detailsCartButton) {
+        detailsCartButton.addEventListener("click", () => {
+            if (isInCart(plan.guid)) {
+                removeFromCart(plan.guid);
+            } else {
+                addToCart(plan);
             }
-        );
-    });
+        });
+
+        updateDetailsCartButton();
+    }
+
+    detailsElement
+        .querySelectorAll(".copy-button")
+        .forEach(button => {
+            button.addEventListener(
+                "click",
+                async () => {
+                    const value =
+                        button.dataset.copyValue ?? "";
+
+                    const textElement =
+                        button.querySelector(
+                            ".copy-button-text"
+                        );
+
+                    try {
+                        await navigator.clipboard.writeText(
+                            value
+                        );
+
+                        textElement.textContent = "Copied";
+                        button.classList.add("copied");
+
+                        setTimeout(() => {
+                            textElement.textContent = "Copy";
+                            button.classList.remove("copied");
+                        }, 1500);
+
+                    } catch (error) {
+                        console.error(
+                            "Could not copy value:",
+                            error
+                        );
+
+                        textElement.textContent = "Failed";
+
+                        setTimeout(() => {
+                            textElement.textContent = "Copy";
+                        }, 1500);
+                    }
+                }
+            );
+        });
+
     /*
      * There is no remote icon to load.
      */
@@ -2642,6 +3742,43 @@ hideMissingTextureGuidsInput.addEventListener(
 );
 
 /*
+ * Cart button + modal events.
+ */
+cartButton.addEventListener("click", () => {
+    if (state.cartView === null) {
+        openCartModal();
+    } else {
+        closeCartModal();
+    }
+});
+
+cartModalClose.addEventListener("click", () => {
+    closeCartModal();
+});
+
+/*
+ * Clicking the backdrop closes the modal.
+ */
+cartModal.addEventListener("click", event => {
+    if (event.target === cartModal) {
+        closeCartModal();
+    }
+});
+
+/*
+ * Escape closes the modal.
+ */
+document.addEventListener("keydown", event => {
+    if (
+        event.key === "Escape" &&
+        cartModal.style.display !== "none"
+    ) {
+        closeCartModal();
+    }
+});
+
+
+/*
  * ============================================================
  * Error handling
  * ============================================================
@@ -2680,6 +3817,11 @@ function showError(error) {
 
 async function start() {
     try {
+        /*
+         * Restore any previously saved carts.
+         */
+        loadCartFromStorage();
+
         setLoading(
             "Loading SQLite engine...",
             "Initializing sql.js"
