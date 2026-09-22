@@ -340,6 +340,10 @@
 
     .category {
         border-bottom: 1px solid #272b34;
+
+        /* Let the browser skip rendering off-screen categories */
+        content-visibility: auto;
+        contain-intrinsic-size: 500px;
     }
 
     .category-name {
@@ -1269,10 +1273,18 @@ const state = {
 
     /*
      * Map:
-     *   texture GUID -> sha1
+     *   texture GUID -> [sha1, url_starter]
+     *
+     * Loaded lazily the first time an icon needs to be resolved
+     * or the user toggles "Hide missing icon GUIDs".
      */
-    textureGuids: {},
-	textureHashToGuids: {},
+    textureGuids: null,
+
+    /*
+     * Reverse map sha1 -> [guids]. Built lazily on first hash
+     * search.
+     */
+    textureHashToGuids: null,
 
     selectedGuid: null,
 
@@ -1281,7 +1293,7 @@ const state = {
      * the currently displayed plan.
      */
     detailsRequestId: 0,
-	
+
 	groupFilterValue: "",
 
 	/*
@@ -1299,6 +1311,12 @@ const state = {
 	 */
 	cartView: null
 };
+
+/*
+ * Promise used to dedupe simultaneous requests for
+ * texture_guids.json.
+ */
+let textureGuidsPromise = null;
 
 
 /*
@@ -1358,12 +1376,30 @@ const CHARACTER_ICONS = {
  * ============================================================
  */
 
+const collator = new Intl.Collator(undefined, {
+    sensitivity: "base",
+    numeric: true
+});
+
+function compareStrings(a, b) {
+    return collator.compare(String(a), String(b));
+}
+
 function hasTextureGuidMapping(plan) {
     if (
         plan.iconGuid === null ||
         plan.iconGuid === undefined ||
         plan.iconGuid === ""
     ) {
+        return false;
+    }
+
+    /*
+     * If texture_guids.json hasn't been loaded yet, we can't
+     * know. Treat as missing so we don't show unverified rows
+     * in "Hide missing" mode until the map is ready.
+     */
+    if (!state.textureGuids) {
         return false;
     }
 
@@ -1608,10 +1644,6 @@ function gamePath(gameId, file) {
     return `${PATHS.gamesRoot}/${pathPart(gameId)}/${file}`;
 }
 
-function gameAssetPath(gameId, file) {
-    return `${PATHS.gamesRoot}/${pathPart(gameId)}/${file}`;
-}
-
 function planIconPath(filename) {
   const name = filename.replace(/\.[^.]+$/, '');
   const isSha1 = /^[a-f0-9]{40}$/i.test(name);
@@ -1619,10 +1651,6 @@ function planIconPath(filename) {
   return isSha1
     ? `${PATHS.assetsRoot}/plan_icons/${pathPart(filename)}`
     : `${PATHS.assetsRoot}/${pathPart(filename)}`;
-}
-
-function isMissing(value) {
-    return value === null || value === undefined;
 }
 
 function normalizeSearch(value) {
@@ -1663,28 +1691,17 @@ function formatSize(value) {
     return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GiB`;
 }
 
-function compareStrings(a, b) {
-    return String(a).localeCompare(
-        String(b),
-        undefined,
-        {
-            sensitivity: "base",
-            numeric: true
-        }
-    );
-}
-
 
 /*
  * ============================================================
  * JSON / binary loading
+ *
+ * All fetches rely on the browser cache (no `cache: "no-store"`).
  * ============================================================
  */
 
 async function fetchJson(url) {
-    const response = await fetch(url, {
-        cache: "no-store"
-    });
+    const response = await fetch(url);
 
     if (!response.ok) {
         throw new Error(
@@ -1696,9 +1713,7 @@ async function fetchJson(url) {
 }
 
 async function fetchText(url) {
-    const response = await fetch(url, {
-        cache: "no-store"
-    });
+    const response = await fetch(url);
 
     if (!response.ok) {
         throw new Error(
@@ -1710,9 +1725,7 @@ async function fetchText(url) {
 }
 
 async function fetchArrayBuffer(url) {
-    const response = await fetch(url, {
-        cache: "no-store"
-    });
+    const response = await fetch(url);
 
     if (!response.ok) {
         throw new Error(
@@ -1725,25 +1738,24 @@ async function fetchArrayBuffer(url) {
 
 /*
  * Returns true if any of the CART_SUPPORT_FILES exist in the
- * given game directory.
+ * given game directory. Files are probed in parallel.
  */
 async function checkCartSupport(gameId) {
-    for (const filename of CART_SUPPORT_FILES) {
-        try {
-            const response = await fetch(
-                gamePath(gameId, filename),
-                { cache: "no-store" }
-            );
+    const results = await Promise.all(
+        CART_SUPPORT_FILES.map(async filename => {
+            try {
+                const response = await fetch(
+                    gamePath(gameId, filename)
+                );
 
-            if (response.ok) {
-                return true;
+                return response.ok;
+            } catch (error) {
+                return false;
             }
-        } catch (error) {
-            /* Ignore and try the next candidate. */
-        }
-    }
+        })
+    );
 
-    return false;
+    return results.some(Boolean);
 }
 
 
@@ -1761,44 +1773,38 @@ async function loadGamesList() {
         throw new Error("games_list.json must contain an array.");
     }
 
+    /*
+     * Load all game names in parallel.
+     */
+    const names = await Promise.all(
+        games.map(async gameId => {
+            try {
+                return (
+                    await fetchText(
+                        gamePath(gameId, "game_name.txt")
+                    )
+                ).trim();
+            } catch (error) {
+                console.warn(
+                    `Could not load game_name.txt for ${gameId}:`,
+                    error
+                );
+
+                return gameId;
+            }
+        })
+    );
+
     gameSelect.innerHTML = "";
 
-    for (const gameId of games) {
-        let gameName;
-
-        try {
-            gameName = (
-                await fetchText(
-                    gamePath(gameId, "game_name.txt")
-                )
-            ).trim();
-        } catch (error) {
-            console.warn(
-                `Could not load game_name.txt for ${gameId}:`,
-                error
-            );
-
-            /*
-             * Fall back to the game ID if game_name.txt
-             * cannot be loaded.
-             */
-            gameName = gameId;
-        }
-
+    games.forEach((gameId, index) => {
         const option = document.createElement("option");
 
-        /*
-         * Keep the directory/game ID as the actual value.
-         */
         option.value = gameId;
-
-        /*
-         * Display the contents of game_name.txt.
-         */
-        option.textContent = gameName;
+        option.textContent = names[index];
 
         gameSelect.appendChild(option);
-    }
+    });
 
     if (games.length === 0) {
         throw new Error("games_list.json contains no games.");
@@ -1811,6 +1817,13 @@ async function loadGamesList() {
 
 async function loadGame(gameId) {
     state.gameId = gameId;
+
+    /*
+     * Reset lazy texture state per game.
+     */
+    state.textureGuids = null;
+    state.textureHashToGuids = null;
+    textureGuidsPromise = null;
 
     setLoading(
         "Loading game...",
@@ -1873,25 +1886,30 @@ async function loadGame(gameId) {
     languageSelect.value = state.language;
 
     /*
-     * Detect cart support for this game.
-     */
-    setLoading(
-        "Checking cart support...",
-        gameId
-    );
-
-    state.cartSupported = await checkCartSupport(gameId);
-
-    /*
      * Make sure there is an array for this game.
      */
     if (!Array.isArray(state.cart[gameId])) {
         state.cart[gameId] = [];
     }
 
-    await loadGameDatabase();
-    await loadTranslations();
-    await loadTextureGuids();
+    /*
+     * Fire cart-support probe, DB load, and translations load in
+     * parallel.
+     */
+    setLoading(
+        "Loading game data...",
+        gameId
+    );
+
+    const [
+        cartSupported
+    ] = await Promise.all([
+        checkCartSupport(gameId),
+        loadGameDatabase(),
+        loadTranslations()
+    ]);
+
+    state.cartSupported = cartSupported;
 
     await preparePlans();
 
@@ -1913,6 +1931,15 @@ async function loadGame(gameId) {
     );
 
     hideLoading();
+
+    /*
+     * Kick off texture_guids.json in the background so that
+     * icon resolution and "hide missing" are ready by the time
+     * the user interacts with them.
+     */
+    ensureTextureGuids().catch(error => {
+        console.warn("Could not load texture_guids.json:", error);
+    });
 }
 
 
@@ -1923,11 +1950,6 @@ async function loadGame(gameId) {
  */
 
 async function loadGameDatabase() {
-    setLoading(
-        "Loading SQLite database...",
-        "Opening plan_details.db"
-    );
-
     const dbBuffer = await fetchArrayBuffer(
         gamePath(state.gameId, "plan_details.db")
     );
@@ -1945,11 +1967,6 @@ async function loadGameDatabase() {
  */
 
 async function loadTranslations() {
-    setLoading(
-        "Loading translations...",
-        state.language
-    );
-
     const languageFile = state.language;
 
     const translations = await fetchJson(
@@ -1976,15 +1993,12 @@ async function loadTranslations() {
 /*
  * ============================================================
  * Texture GUID loading
+ *
+ * This is heavy, so it is deferred until it is actually needed.
  * ============================================================
  */
 
 async function loadTextureGuids() {
-    setLoading(
-        "Loading texture information...",
-        "Reading texture_guids.json"
-    );
-
     const textureGuids = await fetchJson(
         gamePath(
             state.gameId,
@@ -2003,11 +2017,61 @@ async function loadTextureGuids() {
     }
 
     state.textureGuids = textureGuids;
-	// value[0] to only get the hash
-	state.textureHashToGuids = Object.entries(textureGuids).reduce((acc, [key, value]) => {
-  (acc[value[0]] ??= []).push(key);
-  return acc;
-}, {});
+
+    /*
+     * Invalidate any previously built reverse map.
+     */
+    state.textureHashToGuids = null;
+
+    return textureGuids;
+}
+
+function ensureTextureGuids() {
+    if (state.textureGuids) {
+        return Promise.resolve(state.textureGuids);
+    }
+
+    if (!textureGuidsPromise) {
+        textureGuidsPromise = loadTextureGuids().catch(error => {
+            /*
+             * Allow retry on failure.
+             */
+            textureGuidsPromise = null;
+            throw error;
+        });
+    }
+
+    return textureGuidsPromise;
+}
+
+function getTextureHashToGuids() {
+    if (state.textureHashToGuids) {
+        return state.textureHashToGuids;
+    }
+
+    if (!state.textureGuids) {
+        return null;
+    }
+
+    const map = {};
+
+    for (const [key, value] of Object.entries(state.textureGuids)) {
+        if (!Array.isArray(value) || value.length === 0) {
+            continue;
+        }
+
+        const hash = value[0];
+
+        if (!hash) {
+            continue;
+        }
+
+        (map[hash] ??= []).push(key);
+    }
+
+    state.textureHashToGuids = map;
+
+    return map;
 }
 
 
@@ -2059,9 +2123,6 @@ function getTitle(titleKey) {
 }
 
 
-
-
-
 function getCategory(categoryKey) {
     if (categoryKey === null || categoryKey === undefined || categoryKey === "") {
         return (
@@ -2076,7 +2137,7 @@ function getCategory(categoryKey) {
     );
 }
 
-function getTheme(themeKey,categoryKey, popitType) {
+function getTheme(themeKey, categoryKey, popitType) {
     /*
      * A null/empty theme_key defaults to 1647223365.
      */
@@ -2086,7 +2147,7 @@ function getTheme(themeKey,categoryKey, popitType) {
         themeKey === ""
     ) {
         return (
-            `${getPlanCategory(categoryKey, popitType)} ${translationForKey(DEFAULT_THEME_KEY) ??"MISSING_TRANS_KEY"}`
+            `${getPlanCategory(categoryKey, popitType)} ${translationForKey(DEFAULT_THEME_KEY) ?? "MISSING_TRANS_KEY"}`
         );
     }
 
@@ -2191,7 +2252,7 @@ async function preparePlans() {
 		const title = getTitle(titleKey);
 		const description = getDescription(descriptionKey);
 		const category = getPlanCategory(categoryKey, popitType);
-		const theme = getTheme(themeKey,categoryKey, popitType);
+		const theme = getTheme(themeKey, categoryKey, popitType);
 		const character = getCharacterFromSubType(sub_type);
 
 		return {
@@ -2222,7 +2283,6 @@ async function preparePlans() {
     /*
      * Sort alphabetically by category and then title.
      */
-	state.plans.reverse()
     state.plans.sort((a, b) => {
         const categoryCompare = compareStrings(
             a.category,
@@ -2238,33 +2298,6 @@ async function preparePlans() {
             b.title
         );
     });
-}
-
-
-/*
- * ============================================================
- * Category filter
- * ============================================================
- */
-
-function populateCategoryFilter() {
-    const categories = [
-        ...new Set(
-            state.plans.map(plan => plan.category)
-        )
-    ].sort(compareStrings);
-
-    categorySelect.innerHTML =
-        `<option value="">All categories</option>`;
-
-    for (const category of categories) {
-        const option = document.createElement("option");
-
-        option.value = category;
-        option.textContent = category;
-
-        categorySelect.appendChild(option);
-    }
 }
 
 
@@ -2286,134 +2319,167 @@ function getFilteredPlans() {
     const searchTitle = searchTitleInput.checked;
     const searchDescription = searchDescriptionInput.checked;
 	const character = characterSelect.value;
-	
-    let plans = state.plans;
-
-    if (hideMissingTextureGuidsInput.checked) {
-        plans = plans.filter(
-            plan => hasTextureGuidMapping(plan)
-        );
-    }
-	
-	if (character !== "") {
-		plans = plans.filter(
-			plan => plan.character === character
-		);
-	}
-
-
+	const hideMissing = hideMissingTextureGuidsInput.checked;
 
     /*
-     * Category filtering is independent of search.
+     * Special searches (guid / hash) run before text search and
+     * bypass the title/description toggles.
      */
-	if (groupFilter !== "") {
-		plans = plans.filter(plan => {
-			if (groupBy === "theme") {
-				return plan.theme === groupFilter;
-			}
+    const guidSearch = isGuidSearch(rawSearch);
+    const hashSearch = !guidSearch && isHashSearch(rawSearch);
 
-			return plan.category === groupFilter;
-		});
-	}
+    let needle = rawSearch;
 
-    /*
-     * No search text means return everything matching
-     * the category filter.
-     */
-    if (rawSearch === "") {
-        return plans;
+    if (
+        rawSearch !== "" &&
+        !guidSearch &&
+        !hashSearch &&
+        !caseSensitive
+    ) {
+        needle = rawSearch.toLocaleLowerCase();
     }
 
     /*
-     * GUID and hash searches are special searches and do not
-     * depend on the title/description toggles.
+     * The "hide missing" flag can only be honoured once
+     * texture_guids.json is loaded. If it isn't ready yet, we
+     * ignore the filter rather than showing an empty list.
      */
-	if (isGuidSearch(rawSearch)) {
-		const guid = rawSearch.substring(1);
-
-		const try_one = plans.filter(
-			plan => String(plan.guid) === guid
-		);
-
-		if (try_one.length > 0) {
-			return try_one;
-		}
-
-		return plans.filter(
-			plan => String(plan.iconGuid) === guid
-		);
-	}
-
-	if (isHashSearch(rawSearch)) {
-		const wantedHash = caseSensitive
-			? rawSearch
-			: rawSearch.toLowerCase();
-
-		const try_one = plans.filter(plan => {
-			if (
-				plan.hash === null ||
-				plan.hash === undefined
-			) {
-				return false;
-			}
-
-			const planHash = String(plan.hash);
-
-			return caseSensitive
-				? planHash === wantedHash
-				: planHash.toLowerCase() === wantedHash;
-		});
-
-		if (try_one.length > 0) {
-			return try_one;
-		}
-
-		const guids = state.textureHashToGuids[wantedHash];
-
-		if (guids && guids.length > 0) {
-			return plans.filter(
-				plan => guids.includes(String(plan.iconGuid))
-			);
-		}
-	}
+    const canHideMissing =
+        hideMissing && state.textureGuids !== null;
 
     /*
-     * If neither Title nor Description is selected,
-     * nothing can match a normal text search.
+     * Single-pass filter over all plans.
      */
-    if (!searchTitle && !searchDescription) {
-        return [];
-    }
+    const filtered = state.plans.filter(plan => {
+        if (canHideMissing && !hasTextureGuidMapping(plan)) {
+            return false;
+        }
 
-    const needle = caseSensitive
-        ? rawSearch
-        : rawSearch.toLocaleLowerCase();
+        if (character !== "" && plan.character !== character) {
+            return false;
+        }
 
-    return plans.filter(plan => {
-        let titleMatches = false;
-        let descriptionMatches = false;
+        if (groupFilter !== "") {
+            if (groupBy === "theme") {
+                if (plan.theme !== groupFilter) return false;
+            } else {
+                if (plan.category !== groupFilter) return false;
+            }
+        }
+
+        if (rawSearch === "") {
+            return true;
+        }
+
+        if (guidSearch) {
+            /*
+             * Guid search is handled later because it has
+             * fallback logic (plan GUID first, then icon GUID).
+             */
+            return true;
+        }
+
+        if (hashSearch) {
+            /*
+             * Hash search also handled later.
+             */
+            return true;
+        }
+
+        if (!searchTitle && !searchDescription) {
+            return false;
+        }
 
         if (searchTitle) {
             const title = String(plan.title ?? "");
 
-            titleMatches = caseSensitive
-                ? title.includes(needle)
-                : title.toLocaleLowerCase().includes(needle);
+            const haystack = caseSensitive
+                ? title
+                : title.toLocaleLowerCase();
+
+            if (haystack.includes(needle)) {
+                return true;
+            }
         }
 
         if (searchDescription) {
             const description = String(plan.description ?? "");
 
-            descriptionMatches = caseSensitive
-                ? description.includes(needle)
-                : description.toLocaleLowerCase().includes(needle);
+            const haystack = caseSensitive
+                ? description
+                : description.toLocaleLowerCase();
+
+            if (haystack.includes(needle)) {
+                return true;
+            }
         }
 
-        return titleMatches || descriptionMatches;
+        return false;
     });
+
+    /*
+     * Apply GUID / hash special search post-filtering because
+     * they need to operate on the already-filtered set.
+     */
+    if (guidSearch) {
+        const guid = rawSearch.substring(1);
+
+        const byPlanGuid = filtered.filter(
+            plan => String(plan.guid) === guid
+        );
+
+        if (byPlanGuid.length > 0) {
+            return byPlanGuid;
+        }
+
+        return filtered.filter(
+            plan => String(plan.iconGuid) === guid
+        );
+    }
+
+    if (hashSearch) {
+        const wantedHash = caseSensitive
+            ? rawSearch
+            : rawSearch.toLowerCase();
+
+        const byPlanHash = filtered.filter(plan => {
+            if (
+                plan.hash === null ||
+                plan.hash === undefined
+            ) {
+                return false;
+            }
+
+            const planHash = String(plan.hash);
+
+            return caseSensitive
+                ? planHash === wantedHash
+                : planHash.toLowerCase() === wantedHash;
+        });
+
+        if (byPlanHash.length > 0) {
+            return byPlanHash;
+        }
+
+        const map = getTextureHashToGuids();
+
+        if (map) {
+            const guids = map[wantedHash];
+
+            if (guids && guids.length > 0) {
+                const guidSet = new Set(guids);
+
+                return filtered.filter(
+                    plan => guidSet.has(String(plan.iconGuid))
+                );
+            }
+        }
+
+        return [];
+    }
+
+    return filtered;
 }
-
-
 
 
 /*
@@ -2439,9 +2505,6 @@ function renderResults() {
         return;
     }
 
-    /*
-     * Category -> plans
-     */
 	const groupBy = groupBySelect.value;
 
 	const groups = new Map();
@@ -2452,11 +2515,14 @@ function renderResults() {
 				? plan.theme
 				: plan.category;
 
-		if (!groups.has(groupName)) {
-			groups.set(groupName, []);
+		let bucket = groups.get(groupName);
+
+		if (!bucket) {
+			bucket = [];
+			groups.set(groupName, bucket);
 		}
 
-		groups.get(groupName).push(plan);
+		bucket.push(plan);
 	}
 
     const fragment = document.createDocumentFragment();
@@ -2526,6 +2592,7 @@ button.innerHTML = `
                         src="${escapeHtml(characterIcon)}"
                         alt="${escapeHtml(plan.character)}"
                         title="${escapeHtml(plan.character)}"
+                        loading="lazy"
                     >
                 `
                 : ""
@@ -2617,6 +2684,10 @@ function getRemoteIconUrl(plan) {
         return null;
     }
 
+    if (!state.textureGuids) {
+        return null;
+    }
+
     const key = String(plan.iconGuid);
 
     if (
@@ -2628,7 +2699,13 @@ function getRemoteIconUrl(plan) {
         return null;
     }
 
-    const [hash,url_starter] = state.textureGuids[key];
+    const value = state.textureGuids[key];
+
+    if (!Array.isArray(value)) {
+        return null;
+    }
+
+    const [hash, url_starter] = value;
 
     if (
         hash === null ||
@@ -2639,7 +2716,7 @@ function getRemoteIconUrl(plan) {
     }
 
     return (
-		url_starter +
+		(url_starter ?? "") +
         encodeURIComponent(String(hash)) +
         ".png"
     );
@@ -2727,7 +2804,7 @@ function addToCart(plan) {
     cart.push(target);
 
     saveCartToStorage();
-    refreshCartButtons();
+    updateCartButtonForGuid(target);
 }
 
 function removeFromCart(guid) {
@@ -2744,7 +2821,7 @@ function removeFromCart(guid) {
     );
 
     saveCartToStorage();
-    refreshCartButtons();
+    updateCartButtonForGuid(target);
 }
 
 function clearCart() {
@@ -2755,6 +2832,11 @@ function clearCart() {
     state.cart[state.gameId] = [];
 
     saveCartToStorage();
+
+    /*
+     * Clear-all changes every button, so do a full refresh in
+     * this case.
+     */
     refreshCartButtons();
 }
 
@@ -2802,8 +2884,42 @@ function updateDetailsCartButton() {
 }
 
 /*
- * Updates the header cart button, the count badge, every add
- * button in the plan list, and the details add button.
+ * Updates only the list row matching the given guid, the
+ * details button, and the header cart UI.
+ */
+function updateCartButtonForGuid(guid) {
+    const target = String(guid);
+
+    const row = document.querySelector(
+        `.plan-item-row[data-guid="${CSS.escape(target)}"]`
+    );
+
+    if (row) {
+        const button = row.querySelector(
+            ".cart-add-button"
+        );
+
+        if (button) {
+            updateCartAddButton(button, target);
+        }
+    }
+
+    updateDetailsCartButton();
+    updateCartUI();
+
+    /*
+     * If a cart/checkout modal is currently open, refresh it.
+     */
+    if (state.cartView === "cart") {
+        renderCartModal();
+    } else if (state.cartView === "checkout") {
+        renderCheckoutModal();
+    }
+}
+
+/*
+ * Full refresh of every cart button. Used sparingly (clear cart,
+ * cart support toggling on, etc.).
  */
 function refreshCartButtons() {
     document
@@ -2823,9 +2939,6 @@ function refreshCartButtons() {
     updateDetailsCartButton();
     updateCartUI();
 
-    /*
-     * If a cart/checkout modal is currently open, refresh it.
-     */
     if (state.cartView === "cart") {
         renderCartModal();
     } else if (state.cartView === "checkout") {
@@ -2867,6 +2980,7 @@ function createCartEntryIcon(plan) {
 
     img.className = "cart-entry-icon";
     img.alt = "";
+    img.loading = "lazy";
 
     const remote = getRemoteIconUrl(plan);
 
@@ -3160,7 +3274,21 @@ and paste the string in the <code>plan_guids</code> option
 async function selectPlan(plan) {
     state.selectedGuid = plan.guid;
 
-    renderResults();
+    /*
+     * Update only the affected buttons rather than
+     * re-rendering the entire list.
+     */
+    document
+        .querySelectorAll(".plan-item.selected")
+        .forEach(el => el.classList.remove("selected"));
+
+    const newButton = document.querySelector(
+        `.plan-item[data-guid="${CSS.escape(String(plan.guid))}"]`
+    );
+
+    if (newButton) {
+        newButton.classList.add("selected");
+    }
 
     const requestId = ++state.detailsRequestId;
 
@@ -3169,18 +3297,34 @@ async function selectPlan(plan) {
 
 async function renderDetails(plan, requestId) {
     /*
-     * Determine the remote icon URL.
+     * Ensure texture_guids.json is loaded so icon resolution
+     * works. If loading fails we fall back to the missing
+     * icons.
      */
-    const remoteIconUrl = getRemoteIconUrl(plan);
+    try {
+        await ensureTextureGuids();
+    } catch (error) {
+        console.warn(
+            "texture_guids.json could not be loaded:",
+            error
+        );
+    }
 
     /*
-     * If there is no valid texture GUID mapping, we can
-     * immediately use the appropriate missing-GUID icon.
+     * The user may have selected another plan while we were
+     * waiting for texture_guids.json.
      */
+    if (requestId !== state.detailsRequestId) {
+        return;
+    }
+
+    const remoteIconUrl = getRemoteIconUrl(plan);
+
     let initialIcon = null;
 
     if (!remoteIconUrl) {
         const hasTextureMapping =
+            state.textureGuids !== null &&
             plan.iconGuid !== null &&
             plan.iconGuid !== undefined &&
             plan.iconGuid !== "" &&
@@ -3333,73 +3477,26 @@ async function renderDetails(plan, requestId) {
         });
 
     /*
-     * There is no remote icon to load.
+     * Load the icon directly via the img element. The browser
+     * cache prevents double downloads, and we avoid the
+     * previous fetch-then-assign double request.
      */
+    const img = $("planIcon");
+
+    if (!img) {
+        return;
+    }
+
     if (!remoteIconUrl) {
         return;
     }
 
-    try {
-        const response = await fetch(remoteIconUrl, {
-            method: "GET"
-        });
-
-        /*
-         * The user may have selected another plan while this
-         * request was running.
-         */
-        if (requestId !== state.detailsRequestId) {
-            return;
-        }
-
-        const img = $("planIcon");
-
-        if (!img) {
-            return;
-        }
-
-        /*
-         * Successful request.
-         */
-        if (response.ok) {
-            img.src = remoteIconUrl;
-
-            /*
-             * In case the image itself fails to load after the
-             * fetch succeeds.
-             */
-            img.onerror = () => {
-                img.onerror = null;
-                img.src = getFallbackIcon();
-            };
-
-            return;
-        }
-
-        /*
-         * 503 or any other HTTP failure.
-         */
+    img.onerror = () => {
+        img.onerror = null;
         img.src = getFallbackIcon();
+    };
 
-    } catch (error) {
-        /*
-         * Network/CORS/etc. failure.
-         */
-        console.warn(
-            "Could not load remote plan icon:",
-            error
-        );
-
-        if (requestId !== state.detailsRequestId) {
-            return;
-        }
-
-        const img = $("planIcon");
-
-        if (img) {
-            img.src = getFallbackIcon();
-        }
-    }
+    img.src = remoteIconUrl;
 }
 
 function formatTimestamp(timestamp) {
@@ -3490,6 +3587,7 @@ function metadataRow(key, value, options = {}) {
 					src="${escapeHtml(characterIcon)}"
 					alt="${escapeHtml(displayValue)}"
 					title="${escapeHtml(displayValue)}"
+					loading="lazy"
 				>
 			</div>
 		`
@@ -3718,10 +3816,23 @@ languageSelect.addEventListener(
     }
 );
 
+/*
+ * Search input is debounced so that each keystroke doesn't
+ * trigger a full re-render.
+ */
+let searchDebounce = null;
+
 searchInput.addEventListener(
     "input",
     () => {
-        renderResults();
+        if (searchDebounce !== null) {
+            clearTimeout(searchDebounce);
+        }
+
+        searchDebounce = setTimeout(() => {
+            searchDebounce = null;
+            renderResults();
+        }, 150);
     }
 );
 
@@ -3736,7 +3847,30 @@ caseSensitiveInput.addEventListener(
 
 hideMissingTextureGuidsInput.addEventListener(
     "change",
-    () => {
+    async () => {
+        /*
+         * "Hide missing" requires texture_guids.json.
+         * Load it on demand the first time.
+         */
+        if (hideMissingTextureGuidsInput.checked) {
+            try {
+                setLoading(
+                    "Loading texture information...",
+                    "Reading texture_guids.json"
+                );
+
+                await ensureTextureGuids();
+
+                hideLoading();
+            } catch (error) {
+                hideLoading();
+                console.warn(
+                    "Could not load texture_guids.json:",
+                    error
+                );
+            }
+        }
+
         renderResults();
     }
 );
