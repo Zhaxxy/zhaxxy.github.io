@@ -870,6 +870,30 @@
 	overflow-wrap: anywhere;
 }
 
+.cart-entry-text {
+	flex: 1;
+	min-width: 0;
+
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 10px;
+}
+
+.cart-entry-name {
+	min-width: 0;
+	font-size: 14px;
+	overflow-wrap: anywhere;
+}
+
+.cart-entry-guid {
+	flex: 0 0 auto;
+	color: var(--muted);
+	font-family: monospace;
+	font-size: 11px;
+	white-space: nowrap;
+}
+
 .cart-entry-remove {
 	flex: 0 0 auto;
 
@@ -3008,12 +3032,25 @@ function createCartEntry(plan, options = {}) {
 
     entry.appendChild(createCartEntryIcon(plan));
 
-    const name = document.createElement("div");
-    name.className = "cart-entry-name";
-    name.textContent = plan.title;
-    name.title = plan.title;
 
-    entry.appendChild(name);
+
+	const text = document.createElement("div");
+	text.className = "cart-entry-text";
+
+	const name = document.createElement("div");
+	name.className = "cart-entry-name";
+	name.textContent = plan.title;
+	name.title = plan.title;
+
+	const guid = document.createElement("div");
+	guid.className = "cart-entry-guid";
+	guid.textContent = `g${plan.guid}`;
+	guid.title = `g${plan.guid}`;
+
+	text.appendChild(name);
+	text.appendChild(guid);
+
+	entry.appendChild(text);
 
     if (showRemove) {
         const remove = document.createElement("button");
