@@ -149,6 +149,54 @@
   ::-webkit-scrollbar-thumb{background:#333a4b;border-radius:6px;border:2px solid var(--panel);}
   ::-webkit-scrollbar-thumb:hover{background:#414a60;}
 
+  /* ---------- eZlbp2ps4 level code widget ---------- */
+  .level-code-wrap{
+    display:flex;gap:6px;align-items:center;width:100%;min-width:0;
+  }
+  .level-code-wrap .copy-btn{margin-left:0;}
+  .level-code-box{
+    flex:1 1 auto;min-width:0;max-width:100%;
+    overflow-x:auto;overscroll-behavior-x:contain;
+    white-space:nowrap;
+    background:#0e1015;border:1px solid var(--border);border-radius:6px;
+    padding:4px 8px;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+    font-size:12px;line-height:1.6;
+  }
+
+  /* ---------- modal ---------- */
+  .modal-overlay{
+    position:fixed;inset:0;z-index:200;
+    background:rgba(0,0,0,.68);
+    display:flex;align-items:center;justify-content:center;
+    padding:20px;
+    padding-left:calc(20px + env(safe-area-inset-left));
+    padding-right:calc(20px + env(safe-area-inset-right));
+  }
+  .modal{
+    background:var(--panel);border:1px solid var(--border);border-radius:12px;
+    padding:20px;width:100%;max-width:660px;max-height:90vh;overflow-y:auto;
+    display:flex;flex-direction:column;gap:14px;
+    box-shadow:0 20px 60px rgba(0,0,0,.6);
+  }
+  .modal-title{margin:0;font-size:16px;font-weight:650;color:var(--accent2);letter-spacing:.4px;}
+  .modal-code-row{display:flex;gap:6px;align-items:center;width:100%;min-width:0;}
+  .modal-code-row .level-code-box{padding:6px 10px;font-size:12.5px;}
+  .modal-code-row .copy-btn{margin-left:0;line-height:24px;padding:0 10px;}
+  .modal-directions{font-size:13.5px;line-height:1.6;color:#c3cad9;}
+  .modal-directions p{margin:0 0 8px;}
+  .modal-directions code{
+    background:#0e1015;border:1px solid var(--border);border-radius:4px;
+    padding:1px 5px;font-family:ui-monospace,monospace;font-size:12.5px;
+  }
+  .modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:4px;}
+  .modal-close{
+    background:var(--panel2);color:var(--text);border:1px solid var(--border);
+    border-radius:6px;padding:6px 14px;font:inherit;font-size:13px;cursor:pointer;
+    touch-action:manipulation;
+  }
+  .modal-close:hover{border-color:var(--accent);}
+
   /* ============================================================
      Mobile / narrow screens
      ============================================================ */
@@ -215,6 +263,8 @@
     .row-value{font-size:13px;width:100%;}
 
     .copy-btn{line-height:24px;padding:0 10px;margin-left:6px;}
+    .level-code-wrap .copy-btn{margin-left:0;}
+    .level-code-box{font-size:12.5px;padding:6px 8px;}
 
     .group-level-item{flex-wrap:wrap;gap:2px 10px;padding:11px 12px;}
     .gl-name{flex:1 1 100%;white-space:normal;}
@@ -222,6 +272,9 @@
 
     ::-webkit-scrollbar{width:8px;height:8px;}
     ::-webkit-scrollbar-thumb{border-width:1px;}
+
+    .modal{padding:16px;gap:12px;}
+    .modal-overlay{padding:12px;}
   }
 
   @media (max-width: 380px){
@@ -297,6 +350,7 @@ const state = {
   groupOrder: [],
   currentLevel: null,
   currentGroup: null,
+  supportsLevelCodes: false,
 };
 
 /* ============================================================
@@ -312,6 +366,7 @@ function h(tag, attrs, ...kids) {
       if (v === null || v === undefined || v === false) continue;
       if (k === "class") el.className = v;
       else if (k === "text") el.textContent = v;
+      else if (k === "html") el.innerHTML = v;
       else if (k.startsWith("on") && typeof v === "function") el.addEventListener(k.slice(2), v);
       else el.setAttribute(k, v);
     }
@@ -446,6 +501,83 @@ function iconImg(guid) {
   img.title = "g" + guid;
   img.onerror = () => { img.onerror = null; img.src = ASSETS + "missing_texture.png"; };
   return img;
+}
+
+/* ============================================================
+   eZlbp2ps4 level code
+   ============================================================ */
+
+/** UTF-8 safe base64url (RFC 4648 §5) without padding. */
+function base64UrlEncode(str) {
+  const bytes = new TextEncoder().encode(str);
+  let bin = "";
+  const CHUNK = 0x8000;
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
+  }
+  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+/**
+ * Builds the eZlbp2ps4 level code for a level.
+ *  – root_guid  : the level's guid
+ *  – name_str   : name_key (localized) → tut_level_name_or_key (localized) → "g<guid>"
+ *  – desc_str   : desc_key (localized) → tut_level_desc_or_key (localized) → "g<guid> <file_path>"
+ *  – icon_guid  : icon_guid → tut_level_icon → null
+ *  – slot_entry : JSON.parse(raw_slot_json_entry) or null
+ */
+function buildLevelCode(lv) {
+  const b = lv.raw;
+  const guidNum = Number(b.guid);
+
+  let nameStr = null;
+  if (b.name_key !== null && b.name_key !== undefined) {
+    nameStr = resolveKey(b.name_key);
+  } else if (b.tut_level_name_or_key !== null && b.tut_level_name_or_key !== undefined) {
+    nameStr = resolveMaybeKey(b.tut_level_name_or_key, b.tut_level_name_or_key_is_int);
+  }
+
+  let descStr = null;
+  if (b.desc_key !== null && b.desc_key !== undefined) {
+    descStr = resolveKey(b.desc_key);
+  } else if (b.tut_level_desc_or_key !== null && b.tut_level_desc_or_key !== undefined) {
+    descStr = resolveMaybeKey(b.tut_level_desc_or_key, b.tut_level_desc_or_key_is_int);
+  }
+
+  let iconGuid = null;
+  if (b.icon_guid !== null && b.icon_guid !== undefined) {
+    iconGuid = Number(b.icon_guid);
+  } else if (b.tut_level_icon !== null && b.tut_level_icon !== undefined) {
+    iconGuid = Number(b.tut_level_icon);
+  }
+
+  // Fallbacks when neither source provided a value.
+  if (nameStr === null || nameStr === "") nameStr = "g" + b.guid;
+  if (descStr === null || descStr === "") {
+    descStr = "g" + b.guid + (b.file_path ? " " + b.file_path : "");
+  }
+
+  let slotEntry = null;
+  const rawSlot = b.raw_slot_json_entry;
+  if (rawSlot !== null && rawSlot !== undefined && rawSlot !== "") {
+    try {
+      slotEntry = JSON.parse(rawSlot);
+    } catch (e) {
+      console.warn("raw_slot_json_entry is not valid JSON for g" + b.guid, e);
+      slotEntry = null;
+    }
+  }
+
+  // NOTE: key order matters for the compact JSON payload.
+  const payload = {
+    root_guid: guidNum,
+    name_str: nameStr,
+    desc_str: descStr,
+    icon_guid: iconGuid,
+    slot_entry: slotEntry,
+  };
+
+  return base64UrlEncode(JSON.stringify(payload));
 }
 
 /* ============================================================
@@ -606,26 +738,40 @@ async function boot() {
   }
 }
 
+/** Returns true if the game folder has a `support_level_codes.txt` or `support_level_codes` file. */
+async function detectSupportLevelCodes(base) {
+  for (const f of ["support_level_codes.txt", "support_level_codes"]) {
+    try {
+      const r = await fetch(base + f);
+      if (r.ok) return true;
+    } catch (e) { /* ignore */ }
+  }
+  return false;
+}
+
 async function loadGame(gameId) {
   state.gameId = gameId;
   state.base = GAMES_DIR + gameId + "/";
   state.currentLevel = null;
   state.currentGroup = null;
+  state.supportsLevelCodes = false;
   $("#main").innerHTML = "";
   $("#results").innerHTML = "";
   $("#main").appendChild(h("div", { class: "empty", text: "Loading " + gameId + "…" }));
 
   const base = state.base;
 
-  const [nameTxt, langsList, texGuids, dbBuf] = await Promise.all([
+  const [nameTxt, langsList, texGuids, dbBuf, supportsCodes] = await Promise.all([
     fetchText(base + "game_name.txt").catch(() => gameId),
     fetchJSON(base + "languages_list.json").catch(() => []),
     fetchJSON(base + "texture_guids.json").catch(() => ({})),
     fetchBuf(base + "bin_details.db"),
+    detectSupportLevelCodes(base),
   ]);
 
   state.gameName = (nameTxt || gameId).trim();
   state.textureGuids = texGuids || {};
+  state.supportsLevelCodes = supportsCodes;
   state.langsList = (Array.isArray(langsList) && langsList.length) ? langsList : ["english.json"];
   $("#gameTitle").textContent = state.gameName;
   syncHeaderHeight();
@@ -916,6 +1062,88 @@ function renderRows(rows) {
 }
 
 /* ============================================================
+   eZlbp2ps4 level code widgets
+   ============================================================ */
+
+/** Horizontally-scrollable code box + copy + help buttons. */
+function levelCodeWidget(code) {
+  const wrap = h("div", { class: "level-code-wrap" });
+  const box = h("div", { class: "level-code-box", text: code, title: code });
+  const copy = copyButton(code);
+  const help = h("button", {
+    class: "copy-btn",
+    type: "button",
+    title: "How to use this code",
+    text: "?",
+  });
+  help.addEventListener("click", ev => {
+    ev.stopPropagation();
+    ev.preventDefault();
+    showLevelCodeHelp(code);
+  });
+
+  wrap.appendChild(box);
+  wrap.appendChild(copy);
+  wrap.appendChild(help);
+  return wrap;
+}
+
+function showLevelCodeHelp(code) {
+  const overlay = h("div", { class: "modal-overlay" });
+  const modal = h("div", { class: "modal", role: "dialog", "aria-modal": "true" });
+
+  modal.appendChild(h("h3", { class: "modal-title", text: "eZlbp2ps4 Level Code" }));
+
+  const codeRow = h("div", { class: "modal-code-row" });
+  codeRow.appendChild(h("div", { class: "level-code-box", text: code, title: code }));
+  codeRow.appendChild(copyButton(code));
+  modal.appendChild(codeRow);
+
+  const dir = h("div", { class: "modal-directions" });
+  dir.appendChild(h("p", { text: "To use this code, join this discord server" }));
+  dir.appendChild(h("p", {},
+    h("a", {
+      href: "https://discord.gg/ABgkfWMYmv",
+      target: "_blank",
+      rel: "noopener noreferrer",
+      text: "https://discord.gg/ABgkfWMYmv",
+    })
+  ));
+  dir.appendChild(h("p", {},
+    "then run the command ",
+    h("code", { text: "/levelcode2levelbackup" })
+  ));
+  dir.appendChild(h("p", { text: "either in" }));
+  dir.appendChild(h("p", {}, h("b", { text: "#ezlbp2ps4-bot-usage" })));
+  dir.appendChild(h("p", {},
+    "or you can dm the eZlbp2ps4 bot and run the command there and paste the copied code in the ",
+    h("code", { text: "level_code" }),
+    " option"
+  ));
+  modal.appendChild(dir);
+
+  const actions = h("div", { class: "modal-actions" });
+  const closeBtn = h("button", { class: "modal-close", type: "button", text: "Close" });
+  closeBtn.addEventListener("click", () => cleanup());
+  actions.appendChild(closeBtn);
+  modal.appendChild(actions);
+
+  overlay.appendChild(modal);
+  overlay.addEventListener("click", ev => { if (ev.target === overlay) cleanup(); });
+  document.body.appendChild(overlay);
+
+  function onKey(e) {
+    if (e.key === "Escape") { e.stopPropagation(); cleanup(); }
+  }
+  document.addEventListener("keydown", onKey, true);
+
+  function cleanup() {
+    document.removeEventListener("keydown", onKey, true);
+    overlay.remove();
+  }
+}
+
+/* ============================================================
    Level view
    ============================================================ */
 
@@ -933,6 +1161,17 @@ function levelRows(lv) {
   const add = (label, value, copy) => rows.push({ label, value, copy: copy });
   const g = v => (v === null || v === undefined) ? null : "g" + v;
   const bool = v => (v === null || v === undefined) ? null : (Number(v) ? "true" : "false");
+
+  // --- eZlbp2ps4 level code (only if the game supports it) ---
+  if (state.supportsLevelCodes) {
+    try {
+      const code = buildLevelCode(lv);
+      add("eZlbp2ps4 Level Code", levelCodeWidget(code));
+    } catch (e) {
+      console.warn("Could not build level code for g" + lv.guid, e);
+      add("eZlbp2ps4 Level Code", "Error: " + e.message);
+    }
+  }
 
   // --- identity ---
   add("GUID", guidStr(lv.guid), guidStr(lv.guid));
@@ -984,6 +1223,8 @@ function levelRows(lv) {
     add("Tut File Name", b.tut_file_name, b.tut_file_name);
     add("Tut Level Icon GUID", g(b.tut_level_icon));
   }
+
+
 
   return rows;
 }
