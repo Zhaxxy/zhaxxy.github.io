@@ -326,6 +326,13 @@
    Constants / state
    ============================================================ */
 
+/* Keys that are always forced to these values, regardless of the
+   loaded language file. Add to this map as needed. */
+const HARDCODED_TRANSLATIONS = {
+  "69420671": "Race to the Stars",
+  "69420672": "Toggle Escapes The Labyrinth",
+};
+
 const ASSETS    = "lbpbb_assets/";
 const GAMES_DIR = "lbpbb_games/";
 const NO_GROUP  = "NO_LEVEL_GROUP";
@@ -470,12 +477,15 @@ function resolveMaybeKey(value, isIntFlag) {
 }
 
 async function loadLanguage(file) {
+  let loaded = {};
   try {
-    state.langStrings = await fetchJSON(state.base + "languages/" + file) || {};
+    loaded = await fetchJSON(state.base + "languages/" + file) || {};
   } catch (e) {
     console.warn("Could not load language file", file, e);
-    state.langStrings = {};
+    loaded = {};
   }
+  // Hardcoded values always win.
+  state.langStrings = Object.assign({}, loaded, HARDCODED_TRANSLATIONS);
 }
 
 /* ============================================================
