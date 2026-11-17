@@ -648,6 +648,17 @@ function makeLevel(bin) {
     }
   }
 
+  // level_key_slot_ids = JSON list of slot_ids
+  let keySlotIds = [];
+  if (bin.level_key_slot_ids !== null && bin.level_key_slot_ids !== undefined && bin.level_key_slot_ids !== "") {
+    try {
+      const parsed = JSON.parse(bin.level_key_slot_ids);
+      if (Array.isArray(parsed)) keySlotIds = parsed.map(x => String(x));
+    } catch (e) {
+      keySlotIds = String(bin.level_key_slot_ids).split(",").map(s => s.trim()).filter(Boolean);
+    }
+  }
+
   const nextGuid = (bin.what_level_this_unlocks_next_bin_guid !== null &&
                     bin.what_level_this_unlocks_next_bin_guid !== undefined)
     ? String(bin.what_level_this_unlocks_next_bin_guid) : null;
@@ -670,6 +681,7 @@ function makeLevel(bin) {
     groupIsTut,
     iconGuid,
     links,
+	keySlotIds,
     nextGuid,
     hasTut,
   };
@@ -678,7 +690,15 @@ function makeLevel(bin) {
 function buildLevels() {
   state.levels = state.binRows.map(makeLevel);
   state.levelByGuid = new Map();
-  for (const l of state.levels) state.levelByGuid.set(String(l.guid), l);
+  state.levelBySlotId = new Map();              // <-- new
+  for (const l of state.levels) {
+    state.levelByGuid.set(String(l.guid), l);
+    if (l.slot_id !== null && l.slot_id !== undefined) {
+      // first-wins; slot_ids are normally unique
+      const k = String(l.slot_id);
+      if (!state.levelBySlotId.has(k)) state.levelBySlotId.set(k, l);
+    }
+  }
 }
 
 function buildGroups() {
@@ -1023,6 +1043,34 @@ function levelChip(guid) {
   });
 }
 
+function slotChip(slotId) {
+  const sid = String(slotId);
+  const lv = state.levelBySlotId.get(sid);
+  if (!lv) {
+    return h("span", {
+      class: "level-chip missing",
+      title: "Slot " + sid + " is not present in this bin database",
+      text: "slot " + sid + " (missing)",
+    });
+  }
+  return h("a", {
+    class: "level-chip",
+    href: "javascript:void(0)",
+    title: "Slot " + sid + " — g" + lv.guid,
+    text: lv.name,
+    onclick: ev => { ev.preventDefault(); selectLevel(lv.guid); },
+  });
+}
+
+function slotChipList(slotIds) {
+  const span = h("span", { class: "chip-list" });
+  slotIds.forEach((id, i) => {
+    if (i) span.appendChild(document.createTextNode(" | "));
+    span.appendChild(slotChip(id));
+  });
+  return span;
+}
+
 function levelChipList(guids) {
   const span = h("span", { class: "chip-list" });
   guids.forEach((id, i) => {
@@ -1226,6 +1274,7 @@ function levelRows(lv) {
   // --- links ---
   add("What Next?", lv.nextGuid ? levelChip(lv.nextGuid) : null);
   add("Level Link Links", lv.links.length ? levelChipList(lv.links) : null);
+  add("Level Keys", lv.keySlotIds.length ? slotChipList(lv.keySlotIds) : null);   
 
   // --- tutorial / dot-tut metadata ---
   if (lv.hasTut) {
