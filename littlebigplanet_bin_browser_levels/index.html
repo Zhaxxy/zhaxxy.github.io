@@ -1230,7 +1230,13 @@ function levelRows(lv) {
       add("eZlbp2ps4 Level Code", "Error: " + e.message);
     }
   }
-
+  add("Name", lv.name);
+  add("Description", lv.desc);
+  add("Creator", lv.creator);
+  add("Level Group", groupLink(lv.groupId, lv.groupName));
+  add("What Next?", lv.nextGuid ? levelChip(lv.nextGuid) : null);
+  add("Level Link Links", lv.links.length ? levelChipList(lv.links) : null);
+  add("Level Keys", lv.keySlotIds.length ? slotChipList(lv.keySlotIds) : null);   
   // --- identity ---
   add("GUID", guidStr(lv.guid), guidStr(lv.guid));
   add("File Path", lv.file_path, lv.file_path);
@@ -1242,10 +1248,7 @@ function levelRows(lv) {
   add("Metadata File Path", lv.metadata_file_path, lv.metadata_file_path);
 
   // --- metadata ---
-  add("Name", lv.name);
-  add("Description", lv.desc);
-  add("Creator", lv.creator);
-  add("Level Group", groupLink(lv.groupId, lv.groupName));
+
   add("Icon GUID", g(lv.iconGuid), );
 
   // --- level details ---
@@ -1272,9 +1275,7 @@ function levelRows(lv) {
   add("Cross Controller", bool(b.cross_controller));
 
   // --- links ---
-  add("What Next?", lv.nextGuid ? levelChip(lv.nextGuid) : null);
-  add("Level Link Links", lv.links.length ? levelChipList(lv.links) : null);
-  add("Level Keys", lv.keySlotIds.length ? slotChipList(lv.keySlotIds) : null);   
+
 
   // --- tutorial / dot-tut metadata ---
   if (lv.hasTut) {
