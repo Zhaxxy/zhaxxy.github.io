@@ -719,6 +719,31 @@ function base64UrlEncode(str) {
   return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
+/** Strips LBP HTML markup + <icon …> tags and decodes entities,
+    producing plain text suitable for eZlbp2ps4 level codes. */
+function codeSafeText(value) {
+  if (value === null || value === undefined) return "";
+  let s = String(value);
+  if (!s) return "";
+
+  // Drop <icon name> / <icon name/> placeholders entirely.
+  s = s.replace(ICON_TAG_RE, "");
+
+  // Preserve line breaks (otherwise "a<br>b" collapses to "ab").
+  s = s.replace(/<\s*br\s*\/?>/gi, "\n");
+
+  // Strip any remaining HTML tags.
+  s = s.replace(/<\/?[a-z][^>]*>/gi, "");
+
+  // Decode entities (&lt; → <, &amp; → &, &#123; → {, …).
+  let text = s;
+  try {
+    text = new DOMParser().parseFromString(s, "text/html").body.textContent || "";
+  } catch (e) { /* keep s */ }
+
+  return text.replace(/\u00a0/g, " ").trim();
+}
+
 /**
  * Builds the eZlbp2ps4 level code for a level.
  *  – root_guid  : the level's guid
@@ -731,19 +756,23 @@ function buildLevelCode(lv) {
   const b = lv.raw;
   const guidNum = Number(b.guid);
 
+  // --- name ---
   let nameStr = null;
   if (b.name_key !== null && b.name_key !== undefined) {
     nameStr = resolveKey(b.name_key);
   } else if (b.tut_level_name_or_key !== null && b.tut_level_name_or_key !== undefined) {
     nameStr = resolveMaybeKey(b.tut_level_name_or_key, b.tut_level_name_or_key_is_int);
   }
+  nameStr = codeSafeText(nameStr);           // <-- strip markup
 
+  // --- description ---
   let descStr = null;
   if (b.desc_key !== null && b.desc_key !== undefined) {
     descStr = resolveKey(b.desc_key);
   } else if (b.tut_level_desc_or_key !== null && b.tut_level_desc_or_key !== undefined) {
     descStr = resolveMaybeKey(b.tut_level_desc_or_key, b.tut_level_desc_or_key_is_int);
   }
+  descStr = codeSafeText(descStr);           // <-- strip markup
 
   let iconGuid = null;
   if (b.icon_guid !== null && b.icon_guid !== undefined) {
@@ -752,9 +781,9 @@ function buildLevelCode(lv) {
     iconGuid = Number(b.tut_level_icon);
   }
 
-  // Fallbacks when neither source provided a value.
-  if (nameStr === null || nameStr === "") nameStr = "g" + b.guid;
-  if (descStr === null || descStr === "") {
+  // Fallbacks when neither source provided visible text.
+  if (nameStr === "") nameStr = "g" + b.guid;
+  if (descStr === "") {
     descStr = "g" + b.guid + (b.file_path ? " " + b.file_path : "");
   }
 
@@ -769,7 +798,6 @@ function buildLevelCode(lv) {
     }
   }
 
-  // NOTE: key order matters for the compact JSON payload.
   const payload = {
     root_guid: guidNum,
     name_str: nameStr,
