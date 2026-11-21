@@ -5,6 +5,47 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>LBP Bin Browser (Levels) frontend entirely by DeepSeek</title>
 <style>
+  /* ---------- LBP icon fonts ---------- */
+  @font-face{
+    font-family:"LBP-Popit";
+    src:url("lbpbb_assets/Popit.TTF") format("truetype");
+    font-display:block;
+  }
+  @font-face{
+    font-family:"LBP-Wand";
+    src:url("lbpbb_assets/wand_stuff.ttf") format("truetype");
+    font-display:block;
+  }
+.lbp-icon{
+  font-family:"LBP-Popit",sans-serif;
+  font-style:normal;
+  font-weight:400;
+  line-height:1;
+  display:inline-block;
+  vertical-align:-0.08em;          /* baseline nudge (tunable) */
+  speak:none;
+}
+/* Popit's glyphs sit inside a big em-box, so 1em looks tiny. */
+.lbp-icon[data-font="popit"]{
+  font-size:1.99em;                /* scale to match cap-height  */
+  vertical-align:-0.11em;          /* em is relative to icon size */
+}
+/* wand_stuff is already roughly sized for text, so only a slight bump. */
+.lbp-icon[data-font="wand"]{
+  font-size:1.08em;
+  vertical-align:-0.06em;
+}
+/* LBP emphasis: <em> is a colour, not just italics */
+.rich em,
+.level-item em,
+.group-header em,
+.level-chip em,
+.level-title em,
+.level-desc em{
+  font-style:normal;
+  color:var(--accent2);
+  font-weight:600;
+}
   :root{
     --bg:#14161c; --panel:#1c1f28; --panel2:#232733; --border:#323848;
     --text:#e6e9f0; --muted:#9aa3b8; --accent:#6ea8fe; --accent2:#f5c451;
@@ -108,6 +149,7 @@
   .level-info{flex:1 1 320px;min-width:0;}
   .level-title{margin:0 0 6px;font-size:22px;font-weight:650;word-break:break-word;}
   .level-desc{margin:0 0 10px;color:#c3cad9;white-space:pre-wrap;word-break:break-word;}
+  .level-desc.rich{white-space:normal;}
   .group-line{font-size:13px;color:var(--muted);}
   .group-link{font-weight:600;}
 
@@ -119,6 +161,7 @@
   .row:nth-child(odd){background:#1a1d26;}
   .row-label{flex:0 0 210px;color:var(--muted);font-size:12px;letter-spacing:.3px;padding-top:1px;}
   .row-value{flex:1 1 auto;min-width:0;word-break:break-word;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;}
+  .row-value.rich{font-family:inherit;font-size:13px;white-space:normal;}
 
   .copy-btn{
     margin-left:8px;background:var(--panel2);border:1px solid var(--border);color:var(--muted);
@@ -460,6 +503,154 @@ function formatTimestamp(value) {
 }
 
 /* ============================================================
+   Rich text (LBP HTML-ish markup + <icon ...> tags)
+   ============================================================ */
+
+/* name → [font-key, code point]  (code points are taken from the
+   Popit / wand_stuff TTFs supplied with the assets folder) */
+const ICON_DEFS = {
+  cross:            ["popit", 0x0021],  // !
+  lstick:           ["popit", 0x0025],  // %
+  circle:           ["popit", 0x0040],  // @
+  l1:               ["popit", 0x005B],  // [
+  r2:               ["popit", 0x005D],  // ]
+  rstick:           ["popit", 0x005E],  // ^
+  l2:               ["popit", 0x007D],  // }
+  square:           ["popit", 0x0024],  // $
+  start:            ["popit", 0x002A],  // *
+  r1:               ["popit", 0x007B],  // {
+  triangle:         ["popit", 0x00A3],  // £
+  wand_move:        ["wand",  0xE017],
+  wand_trigger:     ["wand",  0xE00C],
+  wand_move_button: ["wand",  0xE00D],
+};
+const ICON_FONTS = { popit: "LBP-Popit", wand: "LBP-Wand" };
+
+/* Tags that survive sanitisation. Everything else is unwrapped
+   (its children are kept, the tag itself is dropped). */
+const RICH_ALLOWED_TAGS = new Set([
+  "B","I","U","S","STRIKE","EM","STRONG","BR","P","DIV","SPAN","SUB","SUP",
+  "SMALL","BIG","H1","H2","H3","H4","H5","H6","UL","OL","LI","BLOCKQUOTE",
+  "HR","CENTER","FONT","CODE","PRE","A"
+]);
+
+const ICON_TAG_RE = /<icon\s+([a-zA-Z0-9_]+)\s*\/?>/gi;
+
+/** Builds a <span> that renders one of the LBP controller glyphs. */
+function iconSpan(name) {
+  const key = String(name || "").toLowerCase();
+  const def = ICON_DEFS[key];
+  const span = document.createElement("span");
+  span.className = "lbp-icon";
+  span.title = key;
+  if (!def) {
+    span.textContent = "[" + key + "]";
+    span.style.opacity = ".6";
+    return span;
+  }
+  span.dataset.font = def[0];                    // <-- new: "popit" or "wand"
+  span.style.fontFamily = '"' + ICON_FONTS[def[0]] + '", sans-serif';
+  span.textContent = String.fromCodePoint(def[1]);
+  return span;
+}
+
+/** Copies `src` children into `dest`, keeping only safe markup. */
+function copyRich(src, dest) {
+  const kids = src.childNodes;
+  for (let i = 0; i < kids.length; i++) {
+    const node = kids[i];
+
+    if (node.nodeType === Node.TEXT_NODE) {
+      dest.appendChild(document.createTextNode(node.nodeValue));
+      continue;
+    }
+    if (node.nodeType !== Node.ELEMENT_NODE) continue;
+
+    const tag = node.tagName.toUpperCase();
+
+    // <icon name> placeholders
+    if (tag === "SPAN" && node.hasAttribute("data-lbp-icon")) {
+      dest.appendChild(iconSpan(node.getAttribute("data-lbp-icon")));
+      continue;
+    }
+
+    // Unknown tag → unwrap, keep its children
+    if (!RICH_ALLOWED_TAGS.has(tag)) {
+      copyRich(node, dest);
+      continue;
+    }
+
+    const el = document.createElement(tag.toLowerCase());
+
+    if (tag === "A") {
+      const href = String(node.getAttribute("href") || "").trim();
+      if (/^(?:https?:\/\/|mailto:)/i.test(href)) {
+        el.setAttribute("href", href);
+        el.setAttribute("target", "_blank");
+        el.setAttribute("rel", "noopener noreferrer");
+      }
+    } else if (tag === "FONT") {
+      const color = String(node.getAttribute("color") || "").trim();
+      if (/^#[0-9a-f]{3,8}$/i.test(color) || /^[a-z]{3,20}$/i.test(color)) {
+        el.setAttribute("color", color);
+      }
+    }
+
+    copyRich(node, el);
+    dest.appendChild(el);
+  }
+}
+
+/**
+ * Parses a name/description string into a sanitised DocumentFragment.
+ * `<icon cross>` style tags become real font glyphs.
+ * Returns null for empty input.
+ */
+function parseRich(value) {
+  if (value === null || value === undefined) return null;
+  const src = String(value);
+  if (!src) return null;
+
+  // Fast path: no markup at all → plain text node
+  if (src.indexOf("<") === -1) {
+    return document.createTextNode(src.replace(/\u00a0/g, " "));
+  }
+
+  const prepared = src.replace(ICON_TAG_RE, (m, n) =>
+    '<span data-lbp-icon="' + n.toLowerCase() + '"></span>');
+
+  let doc;
+  try {
+    doc = new DOMParser().parseFromString(prepared, "text/html");
+  } catch (e) {
+    return document.createTextNode(src);
+  }
+  if (!doc || !doc.body) return document.createTextNode(src);
+
+  const frag = document.createDocumentFragment();
+  copyRich(doc.body, frag);
+  return frag;
+}
+
+/** Same input, but flattened to plain text (used for titles / search). */
+function richToPlain(value) {
+  if (value === null || value === undefined) return "";
+  let s = String(value);
+  if (!s) return "";
+
+  s = s.replace(ICON_TAG_RE, (m, n) => "[" + n.toLowerCase() + "]");
+  s = s.replace(/<\s*br\s*\/?>/gi, " ");
+  s = s.replace(/<\/?[a-z][^>]*>/gi, "");   // strip any remaining tags
+
+  let text = s;
+  try {
+    text = new DOMParser().parseFromString(s, "text/html").body.textContent || "";
+  } catch (e) { /* keep s */ }
+
+  return text.replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
+}
+
+/* ============================================================
    Language / key resolution
    ============================================================ */
 
@@ -663,6 +854,8 @@ function makeLevel(bin) {
                     bin.what_level_this_unlocks_next_bin_guid !== undefined)
     ? String(bin.what_level_this_unlocks_next_bin_guid) : null;
 
+  const creator = resolveMaybeKey(bin.creator_key_or_actual_string, bin.creator_key_or_actual_string_is_int);
+
   return {
     raw: bin,
     guid: bin.guid,
@@ -674,14 +867,18 @@ function makeLevel(bin) {
     slot_id: bin.slot_id,
     metadata_file_path: metadataPath,
     name,
+    namePlain: richToPlain(name),
     desc,
-    creator: resolveMaybeKey(bin.creator_key_or_actual_string, bin.creator_key_or_actual_string_is_int),
+    descPlain: richToPlain(desc),
+    creator,
+    creatorPlain: richToPlain(creator),
     groupId,
     groupName,
+    groupNamePlain: richToPlain(groupName),
     groupIsTut,
     iconGuid,
     links,
-	keySlotIds,
+    keySlotIds,
     nextGuid,
     hasTut,
   };
@@ -690,7 +887,7 @@ function makeLevel(bin) {
 function buildLevels() {
   state.levels = state.binRows.map(makeLevel);
   state.levelByGuid = new Map();
-  state.levelBySlotId = new Map();              // <-- new
+  state.levelBySlotId = new Map();
   for (const l of state.levels) {
     state.levelByGuid.set(String(l.guid), l);
     if (l.slot_id !== null && l.slot_id !== undefined) {
@@ -708,8 +905,9 @@ function buildGroups() {
     let g = state.groups.get(l.groupId);
     if (!g) {
       g = {
-        id: l.groupId, name: l.groupName, levels: [],
-        iconGuid: null, desc: null, creator: null, slotId: null, isTut: l.groupIsTut,
+        id: l.groupId, name: l.groupName, namePlain: l.groupNamePlain,
+        levels: [], iconGuid: null, desc: null, descPlain: "", creator: null,
+        slotId: null, isTut: l.groupIsTut,
       };
       state.groups.set(l.groupId, g);
     }
@@ -722,21 +920,30 @@ function buildGroups() {
     const id = String(row.slot_id);
     let g = state.groups.get(id);
     if (!g) {
-      g = { id, name: resolveKey(row.name_key), levels: [], iconGuid: null, desc: null, creator: null, slotId: id, isTut: false };
+      g = { id, name: resolveKey(row.name_key), namePlain: "", levels: [],
+            iconGuid: null, desc: null, descPlain: "", creator: null,
+            slotId: id, isTut: false };
       state.groups.set(id, g);
     }
     g.slotId = id;
     g.nameKey = row.name_key;
+    if (row.name_key !== null && row.name_key !== undefined) {
+      g.name = resolveKey(row.name_key);
+    }
+    g.namePlain = richToPlain(g.name);
     g.iconGuid = (row.icon_guid !== null && row.icon_guid !== undefined) ? row.icon_guid : null;
     g.desc = (row.desc_key !== null && row.desc_key !== undefined) ? resolveKey(row.desc_key) : null;
+    g.descPlain = richToPlain(g.desc);
     g.creator = resolveMaybeKey(row.creator_key_or_actual_string, row.creator_key_or_actual_string_is_int);
   }
 
   state.groupOrder = [...state.groups.keys()].sort((a, b) => {
     if (a === NO_GROUP) return 1;
     if (b === NO_GROUP) return -1;
-    const na = state.groups.get(a).name || a;
-    const nb = state.groups.get(b).name || b;
+    const ga = state.groups.get(a);
+    const gb = state.groups.get(b);
+    const na = ga.namePlain || ga.name || a;
+    const nb = gb.namePlain || gb.name || b;
     return na.localeCompare(nb, undefined, { sensitivity: "base" });
   });
 }
@@ -909,8 +1116,8 @@ function filterLevels() {
 
   const needle = q.toLowerCase();
   return list.filter(l => {
-    if (byName && l.name && l.name.toLowerCase().includes(needle)) return true;
-    if (byDesc && l.desc && l.desc.toLowerCase().includes(needle)) return true;
+    if (byName && l.namePlain && l.namePlain.toLowerCase().includes(needle)) return true;
+    if (byDesc && l.descPlain && l.descPlain.toLowerCase().includes(needle)) return true;
     return false;
   });
 }
@@ -922,7 +1129,7 @@ function renderGroupFilter() {
   sel.appendChild(h("option", { value: "", text: "All level groups" }));
   for (const gid of state.groupOrder) {
     const g = state.groups.get(gid);
-    sel.appendChild(h("option", { value: gid, text: g.name || gid }));
+    sel.appendChild(h("option", { value: gid, text: g.namePlain || g.name || gid }));
   }
   sel.value = (prev === "" || state.groups.has(prev)) ? prev : "";
 }
@@ -959,10 +1166,10 @@ function renderResults() {
     block.appendChild(h("div", {
       class: "group-header",
       "data-group": gid,
-      title: gid,
+      title: (g && g.namePlain) ? g.namePlain : gid,
       onclick: () => renderGroup(gid),
     },
-      h("span", { text: name }),
+      h("span", {}, parseRich(name)),
       h("span", { class: "group-count", text: String(arr.length) })
     ));
 
@@ -970,9 +1177,9 @@ function renderResults() {
       block.appendChild(h("div", {
         class: "level-item",
         "data-guid": String(l.guid),
-        title: l.name,
+        title: l.namePlain || "",
         onclick: () => selectLevel(l.guid),
-      }, l.name));
+      }, parseRich(l.name)));
     }
 
     container.appendChild(block);
@@ -1037,10 +1244,9 @@ function levelChip(guid) {
   return h("a", {
     class: "level-chip",
     href: "javascript:void(0)",
-    title: "g" + gid,
-    text: lv.name,
+    title: "g" + gid + (lv.namePlain ? " — " + lv.namePlain : ""),
     onclick: ev => { ev.preventDefault(); selectLevel(gid); },
-  });
+  }, parseRich(lv.name));
 }
 
 function slotChip(slotId) {
@@ -1056,10 +1262,9 @@ function slotChip(slotId) {
   return h("a", {
     class: "level-chip",
     href: "javascript:void(0)",
-    title: "Slot " + sid + " — g" + lv.guid,
-    text: lv.name,
+    title: "Slot " + sid + " — g" + lv.guid + (lv.namePlain ? " — " + lv.namePlain : ""),
     onclick: ev => { ev.preventDefault(); selectLevel(lv.guid); },
-  });
+  }, parseRich(lv.name));
 }
 
 function slotChipList(slotIds) {
@@ -1082,16 +1287,20 @@ function levelChipList(guids) {
 
 function groupLink(groupId, groupName) {
   const gid = groupId || NO_GROUP;
-  const label = groupName || gid;
-  if (state.groups.has(gid)) {
+  const grp = state.groups.get(gid);
+  const fallback = groupName || gid;
+  const label = grp && grp.name ? grp.name : fallback;
+  const plain = grp && grp.namePlain ? grp.namePlain : richToPlain(label);
+
+  if (grp) {
     return h("a", {
       class: "group-link",
       href: "javascript:void(0)",
-      text: label,
+      title: plain,
       onclick: ev => { ev.preventDefault(); renderGroup(gid); },
-    });
+    }, parseRich(label));
   }
-  return h("span", { text: label });
+  return h("span", { title: plain }, parseRich(label));
 }
 
 function renderRows(rows) {
@@ -1104,7 +1313,7 @@ function renderRows(rows) {
     const rowEl = h("div", { class: "row" });
     rowEl.appendChild(h("div", { class: "row-label", text: r.label }));
 
-    const vEl = h("div", { class: "row-value" });
+    const vEl = h("div", { class: "row-value" + (r.rich ? " rich" : "") });
     if (Array.isArray(val)) val.forEach(x => vEl.appendChild(x));
     else if (val instanceof Node) vEl.appendChild(val);
     else vEl.appendChild(document.createTextNode(String(val)));
@@ -1216,7 +1425,7 @@ function selectLevel(guid) {
 function levelRows(lv) {
   const b = lv.raw;
   const rows = [];
-  const add = (label, value, copy) => rows.push({ label, value, copy: copy });
+  const add = (label, value, copy, rich) => rows.push({ label, value, copy, rich: !!rich });
   const g = v => (v === null || v === undefined) ? null : "g" + v;
   const bool = v => (v === null || v === undefined) ? null : (Number(v) ? "true" : "false");
 
@@ -1230,13 +1439,14 @@ function levelRows(lv) {
       add("eZlbp2ps4 Level Code", "Error: " + e.message);
     }
   }
-  add("Name", lv.name);
-  add("Description", lv.desc);
+  add("Name", parseRich(lv.name), null, true);
+  add("Description", lv.desc ? parseRich(lv.desc) : null, null, true);
   add("Creator", lv.creator);
   add("Level Group", groupLink(lv.groupId, lv.groupName));
   add("What Next?", lv.nextGuid ? levelChip(lv.nextGuid) : null);
   add("Level Link Links", lv.links.length ? levelChipList(lv.links) : null);
-  add("Level Keys", lv.keySlotIds.length ? slotChipList(lv.keySlotIds) : null);   
+  add("Level Keys", lv.keySlotIds.length ? slotChipList(lv.keySlotIds) : null);
+
   // --- identity ---
   add("GUID", guidStr(lv.guid), guidStr(lv.guid));
   add("File Path", lv.file_path, lv.file_path);
@@ -1248,8 +1458,7 @@ function levelRows(lv) {
   add("Metadata File Path", lv.metadata_file_path, lv.metadata_file_path);
 
   // --- metadata ---
-
-  add("Icon GUID", g(lv.iconGuid), );
+  add("Icon GUID", g(lv.iconGuid));
 
   // --- level details ---
   add("Level Type", b.level_type);
@@ -1290,8 +1499,8 @@ function renderLevel(guid) {
   const head = h("div", { class: "level-head" },
     h("div", { class: "icon-wrap" }, iconImg(lv.iconGuid)),
     h("div", { class: "level-info" },
-      h("h2", { class: "level-title", text: lv.name }),
-      lv.desc ? h("p", { class: "level-desc", text: lv.desc }) : null,
+      h("h2", { class: "level-title" }, parseRich(lv.name)),
+      lv.desc ? h("p", { class: "level-desc rich" }, parseRich(lv.desc)) : null,
       h("div", { class: "group-line" }, "Level Group: ", groupLink(lv.groupId, lv.groupName))
     )
   );
@@ -1322,16 +1531,16 @@ function renderGroup(groupId) {
   const head = h("div", { class: "level-head" },
     h("div", { class: "icon-wrap" }, iconImg(g.iconGuid)),
     h("div", { class: "level-info" },
-      h("h2", { class: "level-title", text: g.name || g.id }),
+      h("h2", { class: "level-title" }, parseRich(g.name || g.id)),
       h("p", { class: "level-desc", text: g.levels.length + " level" + (g.levels.length === 1 ? "" : "s") })
     )
   );
   main.appendChild(head);
 
   const rows = [];
-  const add = (label, value, copy) => rows.push({ label, value, copy });
-  add("Name", g.name);
-  add("Description", g.desc);
+  const add = (label, value, copy, rich) => rows.push({ label, value, copy, rich: !!rich });
+  add("Name", parseRich(g.name || g.id), null, true);
+  add("Description", g.desc ? parseRich(g.desc) : null, null, true);
   add("Creator", g.creator);
   add("Slot ID", g.slotId);
   add("Icon GUID", guidStr(g.iconGuid));
@@ -1346,9 +1555,10 @@ function renderGroup(groupId) {
     for (const l of g.levels) {
       list.appendChild(h("div", {
         class: "group-level-item",
+        title: l.namePlain || "",
         onclick: () => selectLevel(l.guid),
       },
-        h("span", { class: "gl-name", text: l.name }),
+        h("span", { class: "gl-name" }, parseRich(l.name)),
         h("span", { class: "gl-guid", text: "g" + l.guid })
       ));
     }
