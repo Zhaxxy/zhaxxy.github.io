@@ -1274,18 +1274,6 @@ function levelRows(lv) {
   add("Show Slot On Planet", bool(b.show_slot_on_planet));
   add("Cross Controller", bool(b.cross_controller));
 
-  // --- links ---
-
-
-  // --- tutorial / dot-tut metadata ---
-  if (lv.hasTut) {
-    add("Tut Origin Pretty", b.tut_origin_pretty);
-    add("Tut File Name", b.tut_file_name, b.tut_file_name);
-    add("Tut Level Icon GUID", g(b.tut_level_icon));
-  }
-
-
-
   return rows;
 }
 
