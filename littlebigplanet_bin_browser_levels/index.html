@@ -746,10 +746,12 @@ function buildLevelCode(lv) {
   }
 
   let iconGuid = null;
-  if (b.icon_guid !== null && b.icon_guid !== undefined) {
-    iconGuid = Number(b.icon_guid);
-  } else if (b.tut_level_icon !== null && b.tut_level_icon !== undefined) {
-    iconGuid = Number(b.tut_level_icon);
+  if (!isTrue(b.icon_guid_is_not_in_game_file)) {
+    if (b.icon_guid !== null && b.icon_guid !== undefined) {
+      iconGuid = Number(b.icon_guid);
+    } else if (b.tut_level_icon !== null && b.tut_level_icon !== undefined) {
+      iconGuid = Number(b.tut_level_icon);
+    }
   }
 
   // Fallbacks when neither source provided a value.
@@ -1458,7 +1460,9 @@ function levelRows(lv) {
   add("Metadata File Path", lv.metadata_file_path, lv.metadata_file_path);
 
   // --- metadata ---
-  add("Icon GUID", g(lv.iconGuid));
+  if (!isTrue(b.icon_guid_is_not_in_game_file)) {
+	add("Icon GUID", g(lv.iconGuid));
+  }
 
   // --- level details ---
   add("Level Type", b.level_type);
